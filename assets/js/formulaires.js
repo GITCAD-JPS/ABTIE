@@ -83,9 +83,9 @@ function selecteurPhoto(fiche) {
   const etat = { photoLocale: fiche.photoLocale || '', photo: fiche.photo || '' };
   const apercu = el('div', { class: 'photo-apercu' });
   const idEntree = `photo-entree-${Math.random().toString(36).slice(2, 8)}`;
+  // Sans « capture », le téléphone propose l'appareil photo et la photothèque.
   const entree = el('input', {
-    type: 'file', accept: 'image/*', capture: 'environment', class: 'visuellement-cache',
-    id: idEntree,
+    type: 'file', accept: 'image/*', class: 'visuellement-cache', id: idEntree,
   });
 
   const rafraichir = async () => {
