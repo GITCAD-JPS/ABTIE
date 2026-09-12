@@ -60,22 +60,30 @@ function zonePhoto(naviguer) {
   const bloc = el('section', { class: 'bloc bloc-photo' });
 
   if (!etat.apercu) {
-    const id = 'prise-de-vue';
-    const entree = el('input', {
-      type: 'file', accept: 'image/*', capture: 'environment',
-      class: 'visuellement-cache', id,
-    });
-    entree.addEventListener('change', async () => {
-      const fichier = entree.files?.[0];
-      entree.value = '';
-      if (fichier) await traiterPhoto(fichier, naviguer);
-    });
-    const declencheur = el('label', { class: 'bouton bouton-primaire bouton-photo', for: id });
-    declencheur.append(icone('appareil'), el('span', { text: MODES[etat.mode].action }));
+    // Deux entrées distinctes : « capture » ouvre directement l'appareil photo
+    // sur téléphone, son absence laisse choisir dans la photothèque. Une seule
+    // entrée ne peut pas offrir les deux.
+    const source = (id, libelle, nomIcone, classe, appareil) => {
+      const entree = el('input', {
+        type: 'file',
+        accept: 'image/*',
+        capture: appareil ? 'environment' : null,
+        class: 'visuellement-cache',
+        id,
+      });
+      entree.addEventListener('change', async () => {
+        const fichier = entree.files?.[0];
+        entree.value = '';
+        if (fichier) await traiterPhoto(fichier, naviguer);
+      });
+      const declencheur = el('label', { class: `bouton ${classe} bouton-photo`, for: id });
+      declencheur.append(icone(nomIcone), el('span', { text: libelle }));
+      return [declencheur, entree];
+    };
 
     bloc.append(
-      declencheur,
-      entree,
+      ...source('prise-de-vue', MODES[etat.mode].action, 'appareil', 'bouton-primaire', true),
+      ...source('choix-photo', 'Choisir une photo existante', 'image', '', false),
       el('button', {
         type: 'button', class: 'bouton-lien', text: 'Continuer sans photo',
         onclick: () => { etat.etape = 'resultats'; naviguer(null); },
