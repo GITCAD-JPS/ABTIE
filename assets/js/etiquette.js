@@ -11,8 +11,16 @@ import { sansAccent } from './model.js';
 
 const SOURCE_TESSERACT = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
 const LANGUES = 'fra+ita';
+// Le moteur va chercher son ouvrier, son cœur et ses données de langue par
+// des requêtes à lui. Un hébergeur restrictif peut les bloquer sans erreur :
+// la promesse ne se résout alors jamais. Ce délai garantit qu'on rend la main.
+const DELAI_MAX = 30000;
 
 let chargement = null;
+let indisponible = false;
+
+/** La lecture a-t-elle déjà échoué au point de ne plus valoir la peine ? */
+export const lectureIndisponible = () => indisponible;
 
 function chargerMoteur() {
   if (chargement) return chargement;
@@ -34,16 +42,16 @@ function chargerMoteur() {
   return chargement;
 }
 
-export const lectureDisponible = () => navigator.onLine || Boolean(globalThis.Tesseract);
-
 /**
  * Lit le texte d'une photo d'étiquette.
  * `onProgres` reçoit une fraction entre 0 et 1.
- * Renvoie null si la lecture n'a pas pu se faire.
+ * Renvoie null si la lecture n'a pas pu se faire, sans jamais rester en plan.
  */
 export async function lireEtiquette(image, { onProgres } = {}) {
   let ouvrier = null;
-  try {
+  let minuteur = null;
+
+  const reconnaitre = async () => {
     const moteur = await chargerMoteur();
     ouvrier = await moteur.createWorker(LANGUES, 1, {
       logger: (etat) => {
@@ -52,10 +60,20 @@ export async function lireEtiquette(image, { onProgres } = {}) {
     });
     const { data } = await ouvrier.recognize(image);
     return { texte: data.text || '', confiance: data.confidence ?? 0 };
+  };
+
+  const delai = new Promise((_, rejeter) => {
+    minuteur = setTimeout(() => rejeter(new Error('délai dépassé')), DELAI_MAX);
+  });
+
+  try {
+    return await Promise.race([reconnaitre(), delai]);
   } catch (erreur) {
     console.info("Lecture de l'étiquette impossible", erreur);
+    indisponible = true;
     return null;
   } finally {
+    clearTimeout(minuteur);
     if (ouvrier) ouvrier.terminate().catch(() => {});
   }
 }
