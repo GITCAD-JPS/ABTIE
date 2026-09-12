@@ -5,6 +5,7 @@ import {
   badgesAnomalies, etatVide, section, sousTitre, pastilleCouleur, vignette,
 } from '../composants.js';
 import { EMPLACEMENTS, libelleCouleur, trierDegustations } from '../model.js';
+import { platsPourVin, profilDuVin } from '../accords.js';
 import {
   dialogueAjouterBouteilles, dialogueBoire, dialogueDeplacer, formulaireVin,
 } from '../formulaires.js';
@@ -31,6 +32,7 @@ export function rendre(conteneur, { naviguer, params }) {
       stock(vin, rafraichir),
       actions(vin, naviguer, rafraichir),
       caracteristiques(vin),
+      accords(vin, naviguer),
       vin.note ? section('Note personnelle', el('p', { class: 'texte-note', text: vin.note })) : null,
       historique(vin, naviguer),
     ]),
@@ -176,6 +178,35 @@ function caracteristiques(vin) {
       el('dt', { text: cle }),
       el('dd', { text: String(valeur) }),
     ])));
+}
+
+function accords(vin, naviguer) {
+  const profil = profilDuVin(vin);
+  const plats = platsPourVin(vin);
+  if (!plats.length && !profil.temperature) return null;
+
+  const personnels = plats.filter((p) => p.extrait);
+
+  return section('À servir avec', [
+    profil.temperature
+      ? el('p', { class: 'service' }, [
+        el('span', { class: 'etiquette', text: `Température ${profil.temperature}` }),
+        el('span', { class: 'discret', text: profil.description }),
+      ])
+      : null,
+    plats.length
+      ? el('div', { class: 'etiquettes' }, plats.map((p) => el('button', {
+        type: 'button',
+        class: `etiquette etiquette-cliquable${p.extrait ? ' etiquette-perso' : ''}`,
+        title: p.extrait || `Accord suggéré : ${p.libelle.toLowerCase()}`,
+        text: p.libelle,
+        onclick: () => naviguer('/accords'),
+      })))
+      : null,
+    personnels.length
+      ? el('p', { class: 'discret', text: `D'après votre note : ${personnels[0].extrait}` })
+      : null,
+  ]);
 }
 
 function historique(vin, naviguer) {

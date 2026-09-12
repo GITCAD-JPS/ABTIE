@@ -15,7 +15,7 @@ export const VERSION_DONNEES = 1;
 const etat = {
   vins: [],
   degustations: [],
-  preferences: { theme: 'auto', affichage: 'grille' },
+  preferences: { theme: 'auto', affichage: 'grille', lectureAuto: false },
   charge: false,
   majLe: '',
 };
@@ -206,8 +206,9 @@ export function boireBouteille(id, details = {}) {
     date: details.date || aujourdhui(),
     notation: details.notation ?? null,
     commentaire: details.commentaire || '',
-    photo: vin.photo,
-    photoLocale: vin.photoLocale,
+    // Une photo prise au moment de boire l'emporte sur l'étiquette de la fiche.
+    photo: details.photoLocale ? '' : vin.photo,
+    photoLocale: details.photoLocale || vin.photoLocale,
     vinId: vin.id,
   });
   etat.degustations.unshift(degustation);

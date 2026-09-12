@@ -938,3 +938,192 @@ select {
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 0.01ms !important; }
 }
+
+/* --- actions rapides et puces de filtre ---------------------------------- */
+
+.actions-rapides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.bouton-rapide {
+  padding: 0.7rem 0.6rem;
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+
+.puces-rapides,
+.choix-plats {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 0.15rem;
+}
+
+.puces-rapides::-webkit-scrollbar,
+.choix-plats::-webkit-scrollbar { display: none; }
+
+.choix-plats { flex-wrap: wrap; overflow-x: visible; margin-bottom: 1rem; }
+
+.puce {
+  flex: none;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--bordure-forte);
+  border-radius: 999px;
+  background: var(--fond-carte);
+  color: var(--texte-doux);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.puce:hover { background: var(--fond-doux); color: var(--texte); }
+
+.puce.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--sur-accent);
+}
+
+/* --- parcours photo ------------------------------------------------------ */
+
+.vue-photo .fiche-entete h1 { margin-bottom: 0.25rem; }
+
+.bloc-photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.bouton-photo {
+  width: 100%;
+  padding: 1.1rem;
+  font-size: 1rem;
+}
+.bouton-photo .icone { width: 1.5rem; height: 1.5rem; }
+
+.photo-prise { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; width: 100%; }
+
+.photo-prise img {
+  max-width: 100%;
+  max-height: 16rem;
+  object-fit: contain;
+  border-radius: var(--rayon-petit);
+  background: var(--fond-doux);
+}
+
+.progression { width: 100%; display: flex; flex-direction: column; gap: 0.4rem; }
+.progression-piste { height: 0.4rem; border-radius: 999px; background: var(--fond-doux); overflow: hidden; }
+.progression-valeur { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.2s; }
+
+.liste-candidats { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 0.6rem; }
+
+.candidat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  padding: 0.7rem;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  background: var(--fond-doux);
+}
+
+.candidat-texte { min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.candidat-texte h3 { font-size: 0.95rem; }
+.candidat > .bouton { grid-column: 1 / -1; }
+
+.recherche-repli { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.6rem; }
+
+.lignes-lues {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.7rem;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon-petit);
+  background: var(--fond-doux);
+}
+
+.etiquette-cliquable {
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.etiquette-cliquable:hover { border-color: var(--accent); color: var(--accent); }
+
+.etiquette-perso {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-doux);
+  color: var(--accent);
+}
+
+/* --- accords mets et vins ------------------------------------------------ */
+
+.service { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+
+.liste-accords { display: flex; flex-direction: column; gap: 0.6rem; }
+
+.accord {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.7rem;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  background: var(--fond-doux);
+}
+
+.accord-ouvrir {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.accord-texte { min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.accord-titre { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
+.accord-titre h3 { font-size: 0.95rem; }
+
+.accord-raison { color: var(--texte-doux); font-size: 0.85rem; }
+.accord-raison-perso { color: var(--accent); font-weight: 600; }
+
+.affinite {
+  flex: none;
+  color: var(--accent);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+}
+.affinite-1, .affinite-2 { color: var(--texte-doux); }
+
+@media (min-width: 40rem) {
+  .candidat { grid-template-columns: auto 1fr auto; align-items: center; }
+  .candidat > .bouton { grid-column: auto; }
+  .accord { flex-direction: row; align-items: center; justify-content: space-between; }
+  .accord-ouvrir { flex: 1; min-width: 0; }
+}
+
+/* Le libellé du bouton d'entête est redondant avec les actions rapides de la
+   cave : sur téléphone il ne reste que l'icône. */
+.libelle-large { display: none; }
+.bouton-ajouter { padding-inline: 0.7rem; }
+
+.bouton-large { width: 100%; margin-top: 0.7rem; }
+
+@media (min-width: 34rem) {
+  .libelle-large { display: inline; }
+  .bouton-ajouter { padding-inline: 0.85rem; }
+}

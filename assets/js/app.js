@@ -1,26 +1,31 @@
 // Point d'entrée : routage par ancre, barre de navigation, montage des vues.
 
-import { $, dialogue, el, icone, message, vider } from './dom.js';
-import { formulaireVin, installerSuggestions } from './formulaires.js';
+import { $, el, icone, message, vider } from './dom.js';
+import { installerSuggestions } from './formulaires.js';
 import * as store from './store.js';
 import { appliquerTheme, suivreSysteme } from './theme.js';
 
 import * as vueCave from './vues/cave.js';
 import * as vueFiche from './vues/fiche.js';
+import * as vueAccords from './vues/accords.js';
+import * as vuePhoto from './vues/photo.js';
 import * as vueDegustations from './vues/degustations.js';
 import * as vueStatistiques from './vues/statistiques.js';
 import * as vueReglages from './vues/reglages.js';
 
 const ONGLETS = [
   { chemin: '/cave', libelle: 'Cave', icone: 'cave' },
+  { chemin: '/accords', libelle: 'Accords', icone: 'assiette' },
   { chemin: '/degustations', libelle: 'Journal', icone: 'verre' },
-  { chemin: '/statistiques', libelle: 'Statistiques', icone: 'graphique' },
+  { chemin: '/statistiques', libelle: 'Stats', icone: 'graphique' },
   { chemin: '/reglages', libelle: 'Réglages', icone: 'reglages' },
 ];
 
 const ROUTES = [
   { motif: /^\/cave$/, vue: vueCave, titre: 'Cave' },
   { motif: /^\/vin\/([^/]+)$/, vue: vueFiche, titre: 'Fiche', params: ['id'] },
+  { motif: /^\/accords$/, vue: vueAccords, titre: 'Accords' },
+  { motif: /^\/photo\/([^/]+)$/, vue: vuePhoto, titre: 'Photo', params: ['mode'] },
   { motif: /^\/degustations$/, vue: vueDegustations, titre: 'Dégustations' },
   { motif: /^\/statistiques$/, vue: vueStatistiques, titre: 'Statistiques' },
   { motif: /^\/reglages$/, vue: vueReglages, titre: 'Réglages' },
@@ -82,7 +87,8 @@ function rendre() {
 function majOnglets(chemin) {
   for (const lien of document.querySelectorAll('.onglet')) {
     const actif = chemin === lien.dataset.chemin
-      || (lien.dataset.chemin === '/cave' && chemin.startsWith('/vin/'));
+      || (lien.dataset.chemin === '/cave'
+        && RATTACHE_A_LA_CAVE.some((prefixe) => chemin.startsWith(prefixe)));
     lien.classList.toggle('actif', actif);
     if (actif) lien.setAttribute('aria-current', 'page');
     else lien.removeAttribute('aria-current');
@@ -102,18 +108,12 @@ function construireNavigation() {
   }
 }
 
-function ouvrirNouveauVin() {
-  dialogue('Ajouter un vin', (fermer) => formulaireVin(null, {
-    onEnregistre: (vin) => {
-      fermer();
-      if (vin) naviguer(`/vin/${vin.id}`);
-    },
-  }), { largeur: '44rem' });
-}
+/** L'onglet Cave reste actif pendant qu'on est sur une fiche ou une photo. */
+const RATTACHE_A_LA_CAVE = ['/vin/', '/photo/'];
 
 async function demarrer() {
   construireNavigation();
-  $('#ajouter-vin').addEventListener('click', ouvrirNouveauVin);
+  $('#ajouter-vin').addEventListener('click', () => naviguer('/photo/ajout'));
   window.addEventListener('hashchange', rendre);
 
   try {

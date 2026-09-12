@@ -1,0 +1,175 @@
+// Lecture d'une photo d'étiquette et rapprochement avec la cave.
+//
+// La reconnaissance de texte tourne entièrement dans le navigateur, par
+// Tesseract chargé à la demande depuis un CDN. Rien n'est envoyé nulle part.
+// Une étiquette de vin reste un exercice difficile pour un moteur de texte :
+// le résultat sert à proposer, jamais à décider. Tout reste corrigeable, et
+// si le moteur ne peut pas être chargé, les parcours photo fonctionnent
+// quand même, sans préremplissage.
+
+import { sansAccent } from './model.js';
+
+const SOURCE_TESSERACT = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+const LANGUES = 'fra+ita';
+
+let chargement = null;
+
+function chargerMoteur() {
+  if (chargement) return chargement;
+  chargement = new Promise((resoudre, rejeter) => {
+    if (globalThis.Tesseract) {
+      resoudre(globalThis.Tesseract);
+      return;
+    }
+    const balise = document.createElement('script');
+    balise.src = SOURCE_TESSERACT;
+    balise.async = true;
+    balise.onload = () => (globalThis.Tesseract
+      ? resoudre(globalThis.Tesseract)
+      : rejeter(new Error('Moteur de lecture introuvable')));
+    balise.onerror = () => rejeter(new Error('Moteur de lecture inaccessible'));
+    document.head.append(balise);
+  });
+  chargement.catch(() => { chargement = null; });
+  return chargement;
+}
+
+export const lectureDisponible = () => navigator.onLine || Boolean(globalThis.Tesseract);
+
+/**
+ * Lit le texte d'une photo d'étiquette.
+ * `onProgres` reçoit une fraction entre 0 et 1.
+ * Renvoie null si la lecture n'a pas pu se faire.
+ */
+export async function lireEtiquette(image, { onProgres } = {}) {
+  let ouvrier = null;
+  try {
+    const moteur = await chargerMoteur();
+    ouvrier = await moteur.createWorker(LANGUES, 1, {
+      logger: (etat) => {
+        if (etat.status === 'recognizing text' && onProgres) onProgres(etat.progress);
+      },
+    });
+    const { data } = await ouvrier.recognize(image);
+    return { texte: data.text || '', confiance: data.confidence ?? 0 };
+  } catch (erreur) {
+    console.info("Lecture de l'étiquette impossible", erreur);
+    return null;
+  } finally {
+    if (ouvrier) ouvrier.terminate().catch(() => {});
+  }
+}
+
+// --- extraction des champs --------------------------------------------------
+
+const ANNEE_MIN = 1900;
+const ANNEE_MAX = new Date().getFullYear() + 1;
+
+/** Champs reconnaissables sans ambiguïté dans le texte d'une étiquette. */
+export function extraireChamps(texte) {
+  const brut = String(texte || '');
+  const champs = {};
+
+  const annees = [...brut.matchAll(/\b(1[89]\d{2}|20\d{2})\b/g)]
+    .map((t) => Number(t[1]))
+    .filter((a) => a >= ANNEE_MIN && a <= ANNEE_MAX);
+  if (annees.length) champs.millesime = Math.max(...annees);
+
+  const degre = brut.match(/(\d{1,2})[.,](\d)\s*%|\b(\d{1,2})\s*%\s*vol/i);
+  if (degre) {
+    champs.degre = degre[1] ? Number(`${degre[1]}.${degre[2]}`) : Number(degre[3]);
+    if (champs.degre < 4 || champs.degre > 22) delete champs.degre;
+  }
+
+  const volume = brut.match(/\b(\d{2,4})\s*(cl|ml|l)\b/i);
+  if (volume) {
+    const nombre = Number(volume[1]);
+    const unite = volume[2].toLowerCase();
+    const centilitres = unite === 'ml' ? nombre / 10 : unite === 'l' ? nombre * 100 : nombre;
+    if (centilitres >= 18 && centilitres <= 600) {
+      champs.volume = centilitres === 150 ? '150 cl (Magnum)' : `${centilitres} cl`;
+    }
+  }
+
+  champs.lignes = lignesCandidates(brut);
+  return champs;
+}
+
+const BRUIT = new Set(['vino', 'vin', 'wine', 'rosso', 'bianco', 'rouge', 'blanc',
+  'doc', 'docg', 'igt', 'igp', 'aoc', 'aop', 'italia', 'italy', 'france', 'produce',
+  'imbottigliato', 'mis', 'bouteille', 'contient', 'sulfites', 'contains', 'vol',
+  'product', 'of', 'des', 'les', 'del', 'della', 'di', 'da', 'the', 'and', 'et']);
+
+/** Lignes du texte assez substantielles pour servir de nom ou de producteur. */
+function lignesCandidates(texte) {
+  return texte
+    .split(/\r?\n/)
+    .map((ligne) => ligne.replace(/[^\p{L}\p{N}'’&.\- ]/gu, ' ').replace(/\s+/g, ' ').trim())
+    .filter((ligne) => {
+      if (ligne.length < 4 || ligne.length > 60) return false;
+      const mots = ligne.split(' ').filter((m) => m.length > 2);
+      if (!mots.length) return false;
+      return mots.some((m) => !BRUIT.has(sansAccent(m)));
+    })
+    .slice(0, 12);
+}
+
+// --- rapprochement avec la cave ---------------------------------------------
+
+const MOTS_IGNORES = new Set([...BRUIT, 'cave', 'domaine', 'chateau', 'tenuta',
+  'azienda', 'agricola', 'cantina', 'societa', 'srl', 'spa', 'sas', 'classico',
+  'superiore', 'riserva', 'reserve', 'grand', 'cru', 'selection']);
+
+function jetons(texte) {
+  return new Set(
+    sansAccent(texte)
+      .split(/[^a-z0-9]+/)
+      .filter((mot) => mot.length >= 4 && !MOTS_IGNORES.has(mot)),
+  );
+}
+
+/**
+ * Classe les vins de `candidats` par ressemblance avec le texte lu.
+ * Le score est la part des jetons du vin retrouvés dans le texte, augmentée
+ * quand le millésime concorde.
+ */
+export function rapprocher(texte, candidats, { millesime = null, minimum = 0.2 } = {}) {
+  const lus = jetons(texte);
+  if (!lus.size) return [];
+
+  return candidats
+    .map((vin) => {
+      const attendus = jetons(`${vin.nom} ${vin.producteur} ${vin.region} ${vin.cepage}`);
+      if (!attendus.size) return null;
+
+      const communs = [...attendus].filter((mot) => lus.has(mot));
+      // Un millésime qui concorde conforte une ressemblance, il n'en crée
+      // jamais une : sans mot commun, le vin n'est pas un candidat.
+      if (!communs.length) return null;
+      // Un mot du nom pèse plus qu'un mot de la région : on repère lesquels.
+      const motsDuNom = jetons(vin.nom);
+      const poids = communs.reduce((total, mot) => total + (motsDuNom.has(mot) ? 2 : 1), 0);
+      const maximum = [...attendus].reduce((total, mot) => total + (motsDuNom.has(mot) ? 2 : 1), 0);
+      let score = maximum ? poids / maximum : 0;
+
+      if (millesime && vin.millesime === millesime) score += 0.25;
+      else if (millesime && vin.millesime && vin.millesime !== millesime) score -= 0.15;
+
+      return { vin, score: Math.min(1, score), motsCommuns: communs };
+    })
+    .filter((e) => e && e.score >= minimum)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6);
+}
+
+/** Nom le plus plausible parmi les lignes lues, une fois le bruit écarté. */
+export function nomProbable(lignes = []) {
+  const notees = lignes.map((ligne) => {
+    const mots = ligne.split(' ');
+    const utiles = mots.filter((m) => m.length > 3 && !MOTS_IGNORES.has(sansAccent(m)));
+    const majuscules = mots.filter((m) => m === m.toUpperCase() && /\p{L}/u.test(m)).length;
+    return { ligne, score: utiles.length * 2 + majuscules + Math.min(ligne.length, 30) / 30 };
+  });
+  notees.sort((a, b) => b.score - a.score);
+  return notees[0]?.ligne || '';
+}

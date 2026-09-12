@@ -1,8 +1,10 @@
 # Publie le site sur GitHub Pages à chaque poussée sur main.
 #
-# L'étape configure-pages est lancée avec « enablement », ce qui active
-# GitHub Pages sur le dépôt si ce n'est pas déjà fait : aucun réglage à
-# faire à la main dans les paramètres.
+# Étape à faire une seule fois, à la main : Settings → Pages → Source →
+# « GitHub Actions ». Créer un site Pages exige les droits d'administration
+# du dépôt, que GitHub ne donne jamais au jeton automatique des workflows
+# (« Resource not accessible by integration »). Une fois la source choisie,
+# ce workflow prend le relais et republie tout seul.
 
 name: Publier sur GitHub Pages
 
@@ -31,10 +33,8 @@ jobs:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
 
-      - name: Activer et configurer Pages
+      - name: Configurer Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Préparer le site
         uses: actions/upload-pages-artifact@v3
