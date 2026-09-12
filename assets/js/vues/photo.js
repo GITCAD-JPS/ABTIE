@@ -7,7 +7,9 @@
 
 import { bouton, dialogue, el, icone, message, pluriel, vider } from '../dom.js';
 import { sousTitre, vignette } from '../composants.js';
-import { extraireChamps, lireEtiquette, nomProbable, rapprocher } from '../etiquette.js';
+import {
+  extraireChamps, lectureIndisponible, lireEtiquette, nomProbable, rapprocher,
+} from '../etiquette.js';
 import { dialogueAjouterBouteilles, dialogueBoire, formulaireVin } from '../formulaires.js';
 import { filtrerVins } from '../model.js';
 import * as photos from '../photos.js';
@@ -31,7 +33,10 @@ const MODES = {
 let etat = null;
 
 function reinitialiser(mode) {
-  etat = { mode, photoLocale: '', apercu: '', lecture: null, champs: null, etape: 'photo' };
+  etat = {
+    mode, photoLocale: '', apercu: '', lecture: null, champs: null,
+    etape: 'photo', abandon: false,
+  };
 }
 
 export function rendre(conteneur, { naviguer, params }) {
@@ -127,11 +132,23 @@ function zonePhoto(naviguer) {
   }
 
   if (etat.etape === 'lecture') {
+    const demarre = (etat.progres || 0) > 0;
     bloc.append(el('div', { class: 'progression' }, [
-      el('p', { class: 'discret', text: "Lecture de l'étiquette…" }),
-      el('div', { class: 'progression-piste' }, [
-        el('div', { class: 'progression-valeur', style: `width:${Math.round((etat.progres || 0) * 100)}%` }),
+      el('p', {
+        class: 'discret',
+        text: demarre ? "Lecture de l'étiquette…" : 'Préparation du moteur de lecture…',
+      }),
+      el('div', { class: `progression-piste${demarre ? '' : ' indeterminee'}` }, [
+        el('div', {
+          class: 'progression-valeur',
+          style: `width:${Math.round((etat.progres || 0) * 100)}%`,
+        }),
       ]),
+      // Attendre sans pouvoir renoncer est insupportable : on garde la main.
+      el('button', {
+        type: 'button', class: 'bouton-lien', text: 'Passer et choisir à la main',
+        onclick: () => { etat.abandon = true; etat.etape = 'resultats'; naviguer(null); },
+      }),
     ]));
   }
   return bloc;
@@ -150,6 +167,12 @@ async function traiterPhoto(fichier, naviguer) {
   }
   if (photos.enMemoire()) {
     message('Photos gardées le temps de la session : ce navigateur refuse le stockage durable');
+  }
+  // Inutile de reproposer une lecture dont on sait qu'elle ne marche pas ici.
+  if (lectureIndisponible()) {
+    etat.etape = 'resultats';
+    naviguer(null);
+    return;
   }
   if (store.preferences().lectureAuto) {
     await lancerLecture(naviguer);
@@ -175,14 +198,19 @@ async function lancerLecture(naviguer) {
     })
     : null;
 
+  // L'utilisateur a pu renoncer pendant que le moteur cherchait ses morceaux.
+  if (etat.abandon) return;
+
   if (lecture) {
     // Le moteur a répondu : les prochaines photos seront lues sans demander.
     if (!store.preferences().lectureAuto) {
       store.enregistrerPreferences({ lectureAuto: true });
-      message("Étiquette lue. Les prochaines photos le seront automatiquement.");
+      message('Étiquette lue. Les prochaines photos le seront automatiquement.');
     }
   } else {
-    message("L'étiquette n'a pas pu être lue, les champs restent à remplir", 'erreur');
+    // Ne pas réessayer automatiquement ce qui vient d'échouer.
+    if (store.preferences().lectureAuto) store.enregistrerPreferences({ lectureAuto: false });
+    message("La lecture d'étiquette n'est pas disponible ici, choisissez à la main", 'erreur');
   }
 
   etat.lecture = lecture;

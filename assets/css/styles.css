@@ -1140,3 +1140,23 @@ select {
   line-height: 1.45;
   border-bottom: 1px solid color-mix(in srgb, var(--alerte) 35%, transparent);
 }
+
+/* Le moteur de lecture se prépare sans annoncer d'avancement : une barre qui
+   va et vient vaut mieux qu'une barre figée à zéro. */
+.progression-piste.indeterminee {
+  background: linear-gradient(90deg,
+    var(--fond-doux) 0%, var(--accent) 40%, var(--accent) 60%, var(--fond-doux) 100%);
+  background-size: 250% 100%;
+  animation: defilement 1.4s linear infinite;
+}
+
+.progression-piste.indeterminee .progression-valeur { display: none; }
+
+@keyframes defilement {
+  from { background-position: 150% 0; }
+  to { background-position: -150% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progression-piste.indeterminee { animation: none; }
+}
