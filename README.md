@@ -11,11 +11,21 @@ d'étiquettes et 21 dégustations.
 
 ## Ce qu'elle fait
 
+**Depuis le téléphone, en deux gestes**
+- Ajouter un vin en photographiant l'étiquette
+- Signaler une bouteille bue en la photographiant, l'application cherche laquelle c'est dans la cave
+
 **La cave**
 - Recherche instantanée sur le nom, le producteur, la région, le cépage, la provenance et les notes
-- Filtres par couleur, emplacement, région, provenance et statut
+- Filtres d'un geste toujours visibles par couleur et par emplacement, panneau complet pour le reste
 - Tri par nom, producteur, région, millésime, quantité ou note
 - Chaque vin affiche sa photo d'étiquette, sa couleur, sa répartition entre les trois emplacements et ce qui reste à vérifier
+
+**Les accords mets et vins**
+- Choisir un plat parmi seize familles, obtenir les bouteilles en cave qui lui conviennent, classées
+- Température de service et raison de l'accord pour chaque bouteille
+- Les accords tirés de vos propres notes passent devant les suggestions génériques
+- Sur la fiche d'un vin, la liste des plats qui lui vont
 
 **Une fiche par vin**
 - Stock détaillé par emplacement, avec un plus et un moins pour corriger sur place
@@ -41,8 +51,8 @@ d'étiquettes et 21 dégustations.
 
 ## Utiliser l'application
 
-L'application est publiée sur GitHub Pages, à partir de la branche `main` et
-du dossier racine :
+L'application est publiée sur GitHub Pages par le workflow
+`.github/workflows/pages.yml`, à chaque poussée sur `main` :
 
 **https://gitcad-jps.github.io/ABTIE/**
 
@@ -53,6 +63,13 @@ utile au sous-sol.
 
 Les données restent dans le navigateur de chaque appareil et ne suivent donc
 pas de l'un à l'autre : voir « Où sont les données » plus bas.
+
+### Activer la publication, une fois pour toutes
+
+Créer un site GitHub Pages exige les droits d'administration du dépôt, que
+GitHub ne donne jamais au jeton automatique des workflows. Cette étape ne peut
+donc pas être automatisée : dans **Settings → Pages → Source**, choisir
+**GitHub Actions**. Le workflow prend ensuite le relais et republie seul.
 
 ### En local
 
@@ -65,6 +82,30 @@ python3 -m http.server 8000
 ```
 
 Puis ouvrir http://localhost:8000 dans un navigateur.
+
+## Lire une étiquette
+
+Les deux parcours photo proposent de lire l'étiquette pour préremplir la fiche
+ou reconnaître la bouteille. La reconnaissance tourne entièrement dans le
+navigateur, par Tesseract chargé à la demande : aucune photo ne quitte
+l'appareil.
+
+Le moteur pèse plusieurs méga-octets, il n'est donc pas téléchargé sans
+raison. À la première photo, l'application propose de lire l'étiquette. Une
+fois la lecture réussie, les suivantes sont lues sans rien demander.
+
+Ce que donne la lecture, mesuré sur des étiquettes de cette cave :
+
+| Qualité de la photo | Résultat |
+| --- | --- |
+| Étiquette nette et cadrée | Texte exact, millésime, degré et volume repris tels quels |
+| Photo de biais, contrastée | Quelques lettres fautives, le bon vin ressort quand même en tête |
+| Vignette de moins de 300 px | Inexploitable |
+
+Autrement dit : une photo prise de près avec un téléphone fonctionne, une
+vignette récupérée ailleurs non. Quand la lecture échoue, ou que le moteur ne
+peut pas être chargé, le parcours continue sans lui : la photo est conservée
+et la recherche manuelle prend le relais.
 
 ## Où sont les données
 
@@ -125,6 +166,7 @@ le propriétaire de la cave ne sait laquelle des deux valeurs est la bonne.
 ## Organisation du code
 
 ```
+.github/workflows/         publication automatique sur GitHub Pages
 index.html                 coquille de la page et jeu d'icônes SVG
 manifest.webmanifest       description de l'application installable
 sw.js                      service worker : mise en cache pour l'hors ligne
@@ -133,13 +175,15 @@ assets/js/
   app.js                   routage par ancre, navigation, démarrage
   model.js                 normalisation, champs dérivés, filtres, statistiques
   store.js                 état, persistance, actions métier
+  accords.js               profils de cépages et appellations, accords mets et vins
+  etiquette.js             lecture d'une photo d'étiquette, rapprochement avec la cave
   photos.js                photos prises dans l'application (IndexedDB)
   export.js                sauvegarde JSON, exports CSV
   formulaires.js           formulaires et boîtes de dialogue de saisie
   composants.js            fragments d'interface partagés
   dom.js                   aides pour construire le DOM
   theme.js                 thème clair, sombre ou système
-  vues/                    une vue par onglet, plus la fiche d'un vin
+  vues/                    une vue par onglet, la fiche d'un vin, les parcours photo
 data/                      classeur d'origine, jeu de données initial, photos
 tools/xlsx_to_seed.py      import du classeur vers data/
 ```

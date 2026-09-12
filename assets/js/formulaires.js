@@ -133,12 +133,14 @@ function selecteurPhoto(fiche) {
 
 // --- formulaire d'un vin ----------------------------------------------------
 
-export function formulaireVin(vinExistant, { onEnregistre } = {}) {
+export function formulaireVin(vinExistant, { onEnregistre, brouillon } = {}) {
   const vin = vinExistant || {
     nom: '', producteur: '', region: '', cepage: '', couleur: 'rouge', millesime: null,
     volume: '75 cl', degre: null, quantite: 1, provenance: 'Achat', source: '',
     dateReception: aujourdhui(), emplacements: {}, emplacementPrecis: '', note: '',
     notation: null, photo: '', photoLocale: '', statut: 'en-cave',
+    // Le parcours photo fournit déjà la photo et ce qui a pu être lu dessus.
+    ...brouillon,
   };
   const OPTIONS_STATUT = [
     { valeur: 'en-cave', libelle: 'En cave' },
@@ -285,7 +287,7 @@ export function formulaireVin(vinExistant, { onEnregistre } = {}) {
 
 // --- ouvrir une bouteille ---------------------------------------------------
 
-export function dialogueBoire(vin, { onFait } = {}) {
+export function dialogueBoire(vin, { onFait, photoLocale = '' } = {}) {
   const disponibles = EMPLACEMENTS.filter((e) => (vin.emplacements[e.cle] || 0) > 0);
   const options = disponibles.map((e) => ({
     valeur: e.cle,
@@ -326,6 +328,8 @@ export function dialogueBoire(vin, { onFait } = {}) {
         lieu: texteSaisi(formulaire, 'lieu'),
         notation: nombreOuNull(texteSaisi(formulaire, 'notation')),
         commentaire: texteSaisi(formulaire, 'commentaire'),
+        // Photo prise au moment de boire, si le parcours photo en a une.
+        photoLocale,
       });
       const restantes = store.trouverVin(vin.id)?.quantite ?? 0;
       message(restantes > 0

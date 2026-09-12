@@ -1,0 +1,381 @@
+// Parcours photo : ajouter un vin, ou signaler une bouteille bue, en
+// partant de l'appareil photo du téléphone.
+//
+// La photo est le point de départ. La lecture de l'étiquette n'est qu'une
+// aide : elle propose des candidats et préremplit des champs, et tout reste
+// modifiable. Quand la lecture échoue, le parcours continue sans elle.
+
+import { bouton, dialogue, el, icone, message, pluriel, vider } from '../dom.js';
+import { sousTitre, vignette } from '../composants.js';
+import { extraireChamps, lireEtiquette, nomProbable, rapprocher } from '../etiquette.js';
+import { dialogueAjouterBouteilles, dialogueBoire, formulaireVin } from '../formulaires.js';
+import { filtrerVins } from '../model.js';
+import * as photos from '../photos.js';
+import * as store from '../store.js';
+
+const MODES = {
+  boire: {
+    titre: "J'ai bu une bouteille",
+    aide: "Photographiez la bouteille, l'application cherche laquelle c'est dans votre cave.",
+    action: 'Photographier la bouteille',
+  },
+  ajout: {
+    titre: 'Ajouter un vin',
+    aide: "Photographiez l'étiquette, les informations lisibles sont reprises automatiquement.",
+    action: "Photographier l'étiquette",
+  },
+};
+
+// L'état vit entre deux rendus : repasser par la vue ne fait pas reprendre
+// la photo depuis zéro.
+let etat = null;
+
+function reinitialiser(mode) {
+  etat = { mode, photoLocale: '', apercu: '', lecture: null, champs: null, etape: 'photo' };
+}
+
+export function rendre(conteneur, { naviguer, params }) {
+  const mode = MODES[params.mode] ? params.mode : 'ajout';
+  if (!etat || etat.mode !== mode) reinitialiser(mode);
+
+  vider(conteneur);
+  conteneur.append(el('div', { class: 'vue-photo' }, [
+    el('header', { class: 'fiche-entete' }, [
+      bouton('Retour', {
+        icone: 'retour',
+        classe: 'bouton bouton-retour',
+        onclick: () => { etat = null; naviguer('/cave'); },
+      }),
+      el('h1', { text: MODES[mode].titre }),
+      el('p', { class: 'discret', text: MODES[mode].aide }),
+    ]),
+    zonePhoto(naviguer),
+    zoneResultats(naviguer),
+  ]));
+}
+
+// --- prise de vue -----------------------------------------------------------
+
+function zonePhoto(naviguer) {
+  const bloc = el('section', { class: 'bloc bloc-photo' });
+
+  if (!etat.apercu) {
+    const id = 'prise-de-vue';
+    const entree = el('input', {
+      type: 'file', accept: 'image/*', capture: 'environment',
+      class: 'visuellement-cache', id,
+    });
+    entree.addEventListener('change', async () => {
+      const fichier = entree.files?.[0];
+      entree.value = '';
+      if (fichier) await traiterPhoto(fichier, naviguer);
+    });
+    const declencheur = el('label', { class: 'bouton bouton-primaire bouton-photo', for: id });
+    declencheur.append(icone('appareil'), el('span', { text: MODES[etat.mode].action }));
+
+    bloc.append(
+      declencheur,
+      entree,
+      el('button', {
+        type: 'button', class: 'bouton-lien', text: 'Continuer sans photo',
+        onclick: () => { etat.etape = 'resultats'; naviguer(null); },
+      }),
+    );
+    return bloc;
+  }
+
+  bloc.append(
+    el('div', { class: 'photo-prise' }, [
+      el('img', { src: etat.apercu, alt: 'Photo prise' }),
+      el('div', { class: 'photo-prise-actions' }, [
+        bouton('Reprendre', {
+          icone: 'appareil',
+          onclick: () => { reinitialiser(etat.mode); naviguer(null); },
+        }),
+      ]),
+    ]),
+  );
+
+  // La lecture de l'étiquette télécharge un moteur de reconnaissance de
+  // plusieurs méga-octets la première fois. On ne l'impose pas : l'utilisateur
+  // décide, puis le choix est retenu.
+  if (etat.etape === 'proposition') {
+    bloc.append(
+      bouton("Lire l'étiquette", {
+        icone: 'appareil',
+        classe: 'bouton bouton-primaire bouton-large',
+        onclick: () => lancerLecture(naviguer),
+      }),
+      el('p', {
+        class: 'discret',
+        text: 'La reconnaissance se fait dans le téléphone, rien n’est envoyé en ligne. '
+          + 'Le moteur se télécharge à la première utilisation, puis reste en mémoire.',
+      }),
+      el('button', {
+        type: 'button', class: 'bouton-lien', text: 'Continuer sans lire',
+        onclick: () => { etat.etape = 'resultats'; naviguer(null); },
+      }),
+    );
+  }
+
+  if (etat.etape === 'lecture') {
+    bloc.append(el('div', { class: 'progression' }, [
+      el('p', { class: 'discret', text: "Lecture de l'étiquette…" }),
+      el('div', { class: 'progression-piste' }, [
+        el('div', { class: 'progression-valeur', style: `width:${Math.round((etat.progres || 0) * 100)}%` }),
+      ]),
+    ]));
+  }
+  return bloc;
+}
+
+async function traiterPhoto(fichier, naviguer) {
+  try {
+    etat.photoLocale = await photos.enregistrer(fichier);
+    etat.apercu = await photos.url(etat.photoLocale);
+  } catch (erreur) {
+    console.error(erreur);
+    message("La photo n'a pas pu être enregistrée", 'erreur');
+    return;
+  }
+  if (store.preferences().lectureAuto) {
+    await lancerLecture(naviguer);
+    return;
+  }
+  etat.etape = 'proposition';
+  naviguer(null);
+}
+
+async function lancerLecture(naviguer) {
+  etat.etape = 'lecture';
+  etat.progres = 0;
+  naviguer(null);
+
+  const blob = await photos.lire(etat.photoLocale).catch(() => null);
+  const lecture = blob
+    ? await lireEtiquette(blob, {
+      onProgres: (p) => {
+        etat.progres = p;
+        const barre = document.querySelector('.progression-valeur');
+        if (barre) barre.style.width = `${Math.round(p * 100)}%`;
+      },
+    })
+    : null;
+
+  if (lecture) {
+    // Le moteur a répondu : les prochaines photos seront lues sans demander.
+    if (!store.preferences().lectureAuto) {
+      store.enregistrerPreferences({ lectureAuto: true });
+      message("Étiquette lue. Les prochaines photos le seront automatiquement.");
+    }
+  } else {
+    message("L'étiquette n'a pas pu être lue, les champs restent à remplir", 'erreur');
+  }
+
+  etat.lecture = lecture;
+  etat.champs = lecture ? extraireChamps(lecture.texte) : null;
+  etat.etape = 'resultats';
+  naviguer(null);
+}
+
+// --- résultats --------------------------------------------------------------
+
+function zoneResultats(naviguer) {
+  if (etat.etape !== 'resultats') return null;
+  return etat.mode === 'boire' ? resultatsBoire(naviguer) : resultatsAjout(naviguer);
+}
+
+function candidats(seulementEnCave) {
+  if (!etat.lecture?.texte) return [];
+  const source = seulementEnCave
+    ? store.vins().filter((v) => v.statut === 'en-cave' && v.quantite > 0)
+    : store.vins();
+  return rapprocher(etat.lecture.texte, source, { millesime: etat.champs?.millesime });
+}
+
+function resultatsBoire(naviguer) {
+  const trouves = candidats(true);
+  const bloc = el('section', { class: 'bloc' });
+
+  bloc.append(el('div', { class: 'bloc-entete' }, [
+    el('h2', { text: trouves.length ? 'Est-ce ce vin ?' : 'Choisissez la bouteille' }),
+  ]));
+
+  if (trouves.length) {
+    bloc.append(el('div', { class: 'liste-candidats' }, trouves.map((c) => carteCandidat(c, {
+      libelleAction: 'Bouteille bue',
+      onChoisir: (vin) => ouvrirBoire(vin, naviguer),
+    }))));
+    bloc.append(el('p', { class: 'discret', text: 'Aucun ne correspond ? Cherchez ci-dessous.' }));
+  } else if (etat.lecture) {
+    bloc.append(el('p', {
+      class: 'discret',
+      text: "L'étiquette n'a pas permis de reconnaître un vin de la cave. Cherchez-le à la main.",
+    }));
+  }
+
+  bloc.append(rechercheManuelle('en-cave', (vin) => ouvrirBoire(vin, naviguer)));
+  return bloc;
+}
+
+function ouvrirBoire(vin, naviguer) {
+  dialogueBoire(vin, {
+    photoLocale: etat.photoLocale,
+    onFait: () => { etat = null; naviguer('/degustations'); },
+  });
+}
+
+function resultatsAjout(naviguer) {
+  const trouves = candidats(false);
+  const fragments = [];
+
+  if (trouves.length) {
+    fragments.push(el('section', { class: 'bloc' }, [
+      el('div', { class: 'bloc-entete' }, [el('h2', { text: 'Ce vin est peut-être déjà en cave' })]),
+      el('p', {
+        class: 'discret',
+        text: 'Ajoutez une bouteille à une fiche existante plutôt que de créer un doublon.',
+      }),
+      el('div', { class: 'liste-candidats' }, trouves.map((c) => carteCandidat(c, {
+        libelleAction: 'Ajouter une bouteille',
+        onChoisir: (vin) => dialogueAjouterBouteilles(vin, {
+          onFait: () => { etat = null; naviguer(`/vin/${vin.id}`); },
+        }),
+      }))),
+    ]));
+  }
+
+  fragments.push(blocNouvelleFiche(naviguer));
+  return el('div', {}, fragments);
+}
+
+function blocNouvelleFiche(naviguer) {
+  const champs = etat.champs || {};
+  const brouillon = {
+    photoLocale: etat.photoLocale,
+    millesime: champs.millesime ?? null,
+    degre: champs.degre ?? null,
+    volume: champs.volume || '75 cl',
+    nom: nomProbable(champs.lignes || []),
+  };
+
+  const resume = [];
+  if (champs.millesime) resume.push(`millésime ${champs.millesime}`);
+  if (champs.degre) resume.push(`${String(champs.degre).replace('.', ',')} %`);
+  if (champs.volume) resume.push(champs.volume);
+
+  return el('section', { class: 'bloc' }, [
+    el('div', { class: 'bloc-entete' }, [el('h2', { text: 'Nouvelle fiche' })]),
+    resume.length
+      ? el('p', { class: 'discret', text: `Lu sur l'étiquette : ${resume.join(', ')}` })
+      : el('p', {
+        class: 'discret',
+        text: etat.lecture
+          ? "Rien de sûr n'a pu être lu sur l'étiquette, les champs sont à remplir."
+          : 'Les champs sont à remplir à la main.',
+      }),
+    bouton('Créer la fiche', {
+      icone: 'plus',
+      classe: 'bouton bouton-primaire',
+      onclick: () => ouvrirCreation(brouillon, champs.lignes || [], naviguer),
+    }),
+  ]);
+}
+
+function ouvrirCreation(brouillon, lignes, naviguer) {
+  dialogue('Nouvelle fiche', (fermer) => {
+    const formulaire = formulaireVin(null, {
+      brouillon,
+      onEnregistre: (vin) => {
+        fermer();
+        if (vin) { etat = null; naviguer(`/vin/${vin.id}`); }
+      },
+    });
+    if (lignes.length) formulaire.prepend(pastillesLignes(lignes, formulaire));
+    return formulaire;
+  }, { largeur: '44rem' });
+}
+
+/**
+ * Lignes lues sur l'étiquette, cliquables : elles remplissent le dernier champ
+ * texte touché, le nom par défaut. Plus rapide que de tout retaper.
+ */
+function pastillesLignes(lignes, formulaire) {
+  let cible = 'nom';
+  formulaire.addEventListener('focusin', (evenement) => {
+    const nom = evenement.target?.name;
+    if (nom && evenement.target.type === 'text') cible = nom;
+  });
+
+  return el('div', { class: 'lignes-lues' }, [
+    el('span', { class: 'champ-etiquette', text: "Lu sur l'étiquette — touchez pour remplir" }),
+    el('div', { class: 'etiquettes' }, lignes.map((ligne) => el('button', {
+      type: 'button',
+      class: 'etiquette etiquette-cliquable',
+      text: ligne,
+      onclick: () => {
+        const champ = formulaire.elements[cible];
+        if (!champ) return;
+        champ.value = ligne;
+        champ.focus();
+      },
+    }))),
+  ]);
+}
+
+// --- éléments partagés ------------------------------------------------------
+
+function carteCandidat({ vin, score }, { libelleAction, onChoisir }) {
+  return el('article', { class: 'candidat' }, [
+    vignette(vin, { taille: 'petite' }),
+    el('div', { class: 'candidat-texte' }, [
+      el('h3', { text: vin.nom }),
+      el('p', { class: 'carte-soustitre', text: sousTitre(vin) || '—' }),
+      el('div', { class: 'carte-meta' }, [
+        el('span', { class: 'etiquette', text: `ressemblance ${Math.round(score * 100)} %` }),
+        vin.statut === 'en-cave'
+          ? el('span', { class: 'discret', text: pluriel(vin.quantite, 'bouteille', 'bouteilles') })
+          : el('span', { class: 'etiquette etiquette-termine', text: 'Terminé' }),
+      ]),
+    ]),
+    bouton(libelleAction, { classe: 'bouton bouton-primaire', onclick: () => onChoisir(vin) }),
+  ]);
+}
+
+/** Recherche de repli, quand l'étiquette ne donne rien d'exploitable. */
+function rechercheManuelle(statut, onChoisir) {
+  const bloc = el('div', { class: 'recherche-repli' });
+  const entree = el('input', {
+    type: 'search',
+    class: 'recherche',
+    placeholder: 'Chercher dans la cave…',
+    'aria-label': 'Chercher la bouteille dans la cave',
+  });
+  const liste = el('div', { class: 'liste-candidats' });
+
+  const rafraichir = () => {
+    const recherche = entree.value.trim();
+    vider(liste);
+    if (recherche.length < 2) return;
+    const resultats = filtrerVins(store.vins(), { recherche, statut }).slice(0, 8);
+    if (!resultats.length) {
+      liste.append(el('p', { class: 'discret', text: 'Aucun vin ne correspond.' }));
+      return;
+    }
+    for (const vin of resultats) {
+      liste.append(carteCandidat({ vin, score: 1 }, {
+        libelleAction: 'Choisir',
+        onChoisir,
+      }));
+    }
+  };
+
+  let minuteur = null;
+  entree.addEventListener('input', () => {
+    clearTimeout(minuteur);
+    minuteur = setTimeout(rafraichir, 160);
+  });
+
+  bloc.append(entree, liste);
+  return bloc;
+}

@@ -7,7 +7,7 @@ import { bouton, el, icone, pluriel, selection, vider } from '../dom.js';
 import { carteVin, etatVide } from '../composants.js';
 import {
   COULEURS, EMPLACEMENTS, FILTRES_PAR_DEFAUT, TRIS,
-  filtrerVins, filtresActifs, valeursDistinctes,
+  filtrerVins, filtresActifs, libelleCouleur, valeursDistinctes,
 } from '../model.js';
 import { dialogueBoire } from '../formulaires.js';
 import * as store from '../store.js';
@@ -73,14 +73,33 @@ function construireCoquille() {
   tri.addEventListener('change', () => { filtres.tri = tri.value; rafraichir(); });
 
   const liste = el('div', { class: 'zone-liste' });
+  const puces = el('div', { class: 'puces-rapides' });
   const racine = el('div', { class: 'vue-cave' }, [
+    actionsRapides(),
     el('div', { class: 'barre-recherche' }, [recherche, basculer]),
+    puces,
     panneau,
     el('div', { class: 'barre-resultats' }, [compte, tri]),
     liste,
   ]);
 
-  return { racine, recherche, basculer, compteurFiltres, panneau, compte, tri, liste, naviguer: null };
+  return {
+    racine, recherche, basculer, compteurFiltres, panneau, puces,
+    compte, tri, liste, naviguer: null,
+  };
+}
+
+/** Les deux gestes du quotidien, en haut et sous le pouce. */
+function actionsRapides() {
+  const lien = (chemin, nomIcone, libelle, classe) => {
+    const noeud = el('a', { class: `bouton ${classe} bouton-rapide`, href: `#${chemin}` });
+    noeud.append(icone(nomIcone), el('span', { text: libelle }));
+    return noeud;
+  };
+  return el('div', { class: 'actions-rapides' }, [
+    lien('/photo/ajout', 'appareil', 'Ajouter un vin', 'bouton-primaire'),
+    lien('/photo/boire', 'verre', "J'ai bu une bouteille", ''),
+  ]);
 }
 
 function rafraichir() {
@@ -97,6 +116,7 @@ function rafraichir() {
 
   coquille.panneau.hidden = !panneauOuvert;
   if (panneauOuvert) remplirPanneau(coquille.panneau, vins);
+  remplirPuces(coquille.puces, vins);
 
   coquille.tri.value = filtres.tri;
   coquille.compte.textContent =
@@ -118,6 +138,44 @@ function rafraichir() {
     onOuvrir: (v) => naviguer(`/vin/${v.id}`),
     onBoire: (v) => dialogueBoire(v, { onFait: rafraichir }),
   }))));
+}
+
+/**
+ * Filtres d'un geste, toujours visibles : les seuls dont on se sert debout
+ * devant la cave. Le panneau complet reste là pour le reste.
+ */
+function remplirPuces(conteneur, vins) {
+  const puce = (libelle, actif, onclick) => el('button', {
+    type: 'button',
+    class: `puce${actif ? ' active' : ''}`,
+    'aria-pressed': String(actif),
+    text: libelle,
+    onclick,
+  });
+
+  const aucunFiltre = !filtres.couleur && !filtres.emplacement;
+  const elements = [
+    puce('Tout', aucunFiltre, () => {
+      filtres.couleur = '';
+      filtres.emplacement = '';
+      rafraichir();
+    }),
+  ];
+
+  for (const couleur of COULEURS) {
+    if (!vins.some((v) => v.couleur === couleur.cle && v.statut === 'en-cave')) continue;
+    elements.push(puce(libelleCouleur(couleur.cle), filtres.couleur === couleur.cle, () => {
+      filtres.couleur = filtres.couleur === couleur.cle ? '' : couleur.cle;
+      rafraichir();
+    }));
+  }
+  for (const emplacement of EMPLACEMENTS) {
+    elements.push(puce(emplacement.court, filtres.emplacement === emplacement.cle, () => {
+      filtres.emplacement = filtres.emplacement === emplacement.cle ? '' : emplacement.cle;
+      rafraichir();
+    }));
+  }
+  vider(conteneur).append(...elements);
 }
 
 function remplirPanneau(panneau, vins) {
