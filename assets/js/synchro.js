@@ -11,7 +11,7 @@
 // dernier écrit l'emporte. Un document unique pour toute la cave aurait fait
 // perdre le travail de l'un dès que l'autre touchait à quoi que ce soit.
 
-const COLLECTIONS = { vins: 'vins', degustations: 'degustations' };
+const COLLECTIONS = { vins: 'vins', degustations: 'degustations', apercus: 'apercus' };
 const DELAI_REPRISE = 5000;
 
 let base = null;
@@ -194,6 +194,33 @@ function rejouer() {
   }
 }
 
+// --- aperçus de photos ------------------------------------------------------
+//
+// Le dépôt de fichiers de l'hébergeur n'est ouvert qu'à qui peut modifier la
+// page. Un appareil qui ne l'a pas garde sa photo dans son seul navigateur, et
+// le vin arriverait sans image chez les autres. Une copie réduite passe alors
+// par ici : elle tient dans un document, voyage avec la cave, et suffit à
+// reconnaître une étiquette. Elle vit à part des fiches pour ne pas alourdir
+// les instantanés, que l'application relit en entier à chaque changement.
+
+const cheminApercu = (cle) => `${COLLECTIONS.apercus}/${cle}`;
+
+export function ecrireApercu(cle, image) {
+  if (!base) return Promise.resolve();
+  return base.doc(cheminApercu(cle)).set({ id: cle, image });
+}
+
+export async function lireApercu(cle) {
+  if (!base) return '';
+  const document_ = await base.doc(cheminApercu(cle)).get();
+  return document_?.exists ? String(document_.data()?.image || '') : '';
+}
+
+export function effacerApercu(cle) {
+  if (!base) return Promise.resolve();
+  return base.doc(cheminApercu(cle)).delete().catch(() => {});
+}
+
 export const ecrireVin = (vin) => pousser(COLLECTIONS.vins, vin);
 export const effacerVin = (id) => pousser(COLLECTIONS.vins, { id }, true);
 export const ecrireDegustation = (d) => pousser(COLLECTIONS.degustations, d);
@@ -202,9 +229,10 @@ export const effacerDegustation = (id) => pousser(COLLECTIONS.degustations, { id
 /** Remplace tout le contenu partagé, après une restauration ou une remise à zéro. */
 export async function remplacerTout({ vins, degustations }) {
   if (!base) return;
-  const [ancienVins, ancienDegustations] = await Promise.all([
+  const [ancienVins, ancienDegustations, anciensApercus] = await Promise.all([
     base.collection(COLLECTIONS.vins).get(),
     base.collection(COLLECTIONS.degustations).get(),
+    base.collection(COLLECTIONS.apercus).get(),
   ]);
   const gardes = new Set([
     ...vins.map((v) => `${COLLECTIONS.vins}/${v.id}`),
@@ -219,8 +247,17 @@ export async function remplacerTout({ vins, degustations }) {
     .filter(({ chemin }) => !gardes.has(chemin))
     .map(({ chemin }) => base.doc(chemin).delete().catch(() => {}));
 
+  // Un aperçu que plus aucune fiche ne réclame n'a plus de raison d'occuper
+  // une place dans la cave partagée.
+  const photosGardees = new Set([...vins, ...degustations]
+    .map((fiche) => fiche.photoLocale).filter(Boolean));
+  const apercusPerimes = anciensApercus.docs
+    .filter((document_) => !photosGardees.has(document_.id))
+    .map((document_) => effacerApercu(document_.id));
+
   await Promise.all([
     ...suppressions,
+    ...apercusPerimes,
     ...vins.map((vin) => ecrire(COLLECTIONS.vins, vin).catch(() => {})),
     ...degustations.map((d) => ecrire(COLLECTIONS.degustations, d).catch(() => {})),
   ]);

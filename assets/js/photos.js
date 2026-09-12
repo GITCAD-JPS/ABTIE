@@ -9,10 +9,17 @@
 // le temps de la session et l'application reste utilisable. `enMemoire()` dit
 // si c'est le cas, pour prévenir honnêtement.
 
+import * as synchro from './synchro.js';
+
 const BASE = 'cave-a-vin';
 const MAGASIN = 'photos';
 const COTE_MAX = 1400;
 const QUALITE = 0.82;
+// Copie réduite qui voyage avec la cave quand le dépôt de l'hébergeur est
+// fermé. Assez fine pour reconnaître une étiquette, assez légère pour tenir
+// dans un document sans peser sur la synchronisation.
+const APERCU_COTE = 420;
+const APERCU_QUALITE = 0.62;
 // Une photo déposée chez l'hébergeur porte ce préfixe : elle suit alors la
 // cave d'un appareil à l'autre, au lieu de rester dans un seul navigateur.
 const PREFIXE_PARTAGE = 'a:';
@@ -126,6 +133,7 @@ export const supprimer = async (cle) => {
     await depot?.delete(identifiantPartage(cle)).catch(() => {});
     return undefined;
   }
+  await synchro.effacerApercu(cle).catch(() => {});
   return avecRepli(
     () => transaction('readwrite', (m) => m.delete(cle)),
     () => { memoire.delete(cle); },
@@ -137,12 +145,12 @@ export const clefs = () => avecRepli(
 );
 
 /** Réduit une image choisie ou photographiée avant de la stocker. */
-export async function redimensionner(fichier) {
+export async function redimensionner(fichier, cote = COTE_MAX, qualite = QUALITE) {
   const bitmap = await creerBitmap(fichier);
   const source = Math.max(bitmap.width || 0, bitmap.height || 0);
   if (!source) return fichier;
 
-  const facteur = Math.min(1, COTE_MAX / source);
+  const facteur = Math.min(1, cote / source);
   const largeur = Math.max(1, Math.round(bitmap.width * facteur));
   const hauteur = Math.max(1, Math.round(bitmap.height * facteur));
 
@@ -158,7 +166,7 @@ export async function redimensionner(fichier) {
   // alors très bien l'affaire.
   const blob = await new Promise((r) => {
     try {
-      toile.toBlob(r, 'image/jpeg', QUALITE);
+      toile.toBlob(r, 'image/jpeg', qualite);
     } catch {
       r(null);
     }
@@ -192,7 +200,13 @@ export async function url(cle) {
     urls.set(cle, objet);
     return objet;
   }
-  return estPartagee(cle) ? adressePartagee(cle) : '';
+  if (estPartagee(cle)) return adressePartagee(cle);
+
+  // Photo prise sur un autre appareil, qui n'a pas pu la déposer chez
+  // l'hébergeur : c'est sa copie réduite, arrivée avec la cave, qui s'affiche.
+  const apercu = await synchro.lireApercu(cle).catch(() => '');
+  if (apercu) urls.set(cle, apercu);
+  return apercu;
 }
 
 export function oublier(cle) {
@@ -223,7 +237,26 @@ export async function enregistrer(fichier) {
 
   const cle = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   await ecrire(cle, blob);
+  await partagerApercu(cle, blob);
   return cle;
+}
+
+/**
+ * Dépose une copie réduite de la photo dans la cave partagée.
+ *
+ * Elle n'a de sens que là : sans partage, personne n'a besoin de cette copie
+ * et elle ne ferait qu'occuper de la place. Son échec ne remet rien en cause,
+ * la photo d'origine est déjà rangée et le vin s'enregistre normalement.
+ */
+async function partagerApercu(cle, blob) {
+  if (!synchro.synchroActive()) return;
+  try {
+    const reduite = await redimensionner(blob, APERCU_COTE, APERCU_QUALITE);
+    const image = await versDataUrl(reduite);
+    if (image) await synchro.ecrireApercu(cle, image);
+  } catch (erreur) {
+    console.info('Aperçu partagé non déposé', erreur);
+  }
 }
 
 /**
@@ -231,7 +264,9 @@ export async function enregistrer(fichier) {
  *
  * `clesUtilisees` vient des fiches : une photo déposée chez l'hébergeur
  * n'est pas dans ce navigateur, elle serait donc absente d'une sauvegarde
- * établie à partir du seul contenu local.
+ * établie à partir du seul contenu local. Une photo prise sur un autre
+ * appareil n'existe nulle part ici : sa copie réduite, elle, est à portée et
+ * vaut mieux qu'un vin sans image.
  */
 export async function exporter(clesUtilisees = []) {
   const locales = await clefs().catch(() => []);
@@ -240,6 +275,10 @@ export async function exporter(clesUtilisees = []) {
     if (!cle) continue;
     const blob = await lire(cle).catch(() => null);
     if (blob) paquet[cle] = await versDataUrl(blob);
+    else {
+      const apercu = await synchro.lireApercu(cle).catch(() => '');
+      if (apercu) paquet[cle] = apercu;
+    }
   }
   return paquet;
 }
