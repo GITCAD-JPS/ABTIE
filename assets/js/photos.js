@@ -2,6 +2,12 @@
 // une photo de téléphone pèse plusieurs centaines de kilo-octets, bien au-delà
 // de ce que localStorage peut absorber. Les photos livrées avec le classeur
 // restent, elles, de simples fichiers sous data/photos/.
+//
+// Certains navigateurs refusent IndexedDB à une page affichée dans un cadre
+// d'un autre site, ou en navigation privée. Plutôt que de bloquer l'ajout
+// d'un vin, on retombe alors sur une réserve en mémoire : les photos tiennent
+// le temps de la session et l'application reste utilisable. `enMemoire()` dit
+// si c'est le cas, pour prévenir honnêtement.
 
 const BASE = 'cave-a-vin';
 const MAGASIN = 'photos';
@@ -9,21 +15,42 @@ const COTE_MAX = 1400;
 const QUALITE = 0.82;
 
 let connexion = null;
+let repliMemoire = false;
+const memoire = new Map();
+
+/** Lire `requete.error` lève quand la requête n'est pas terminée. */
+function erreurDe(requete, defaut) {
+  try {
+    return requete.error || new Error(defaut);
+  } catch {
+    return new Error(defaut);
+  }
+}
+
+export const enMemoire = () => repliMemoire;
 
 function ouvrir() {
   if (connexion) return connexion;
   connexion = new Promise((resoudre, rejeter) => {
-    if (!('indexedDB' in globalThis)) {
-      rejeter(new Error("Ce navigateur ne gère pas le stockage des photos"));
+    if (!('indexedDB' in globalThis) || !indexedDB) {
+      rejeter(new Error('stockage des photos indisponible'));
       return;
     }
-    const requete = indexedDB.open(BASE, 1);
+    let requete;
+    try {
+      requete = indexedDB.open(BASE, 1);
+    } catch (erreur) {
+      // Safari lève ici quand le stockage est refusé à la page.
+      rejeter(erreur);
+      return;
+    }
     requete.onupgradeneeded = () => {
       const base = requete.result;
       if (!base.objectStoreNames.contains(MAGASIN)) base.createObjectStore(MAGASIN);
     };
     requete.onsuccess = () => resoudre(requete.result);
-    requete.onerror = () => rejeter(requete.error);
+    requete.onerror = () => rejeter(erreurDe(requete, 'stockage refusé'));
+    requete.onblocked = () => rejeter(new Error('stockage occupé'));
   });
   connexion.catch(() => { connexion = null; });
   return connexion;
@@ -31,32 +58,75 @@ function ouvrir() {
 
 function transaction(mode, action) {
   return ouvrir().then((base) => new Promise((resoudre, rejeter) => {
-    const tx = base.transaction(MAGASIN, mode);
-    const requete = action(tx.objectStore(MAGASIN));
+    let requete;
+    try {
+      const tx = base.transaction(MAGASIN, mode);
+      requete = action(tx.objectStore(MAGASIN));
+    } catch (erreur) {
+      rejeter(erreur);
+      return;
+    }
     requete.onsuccess = () => resoudre(requete.result);
-    requete.onerror = () => rejeter(requete.error);
+    requete.onerror = () => rejeter(erreurDe(requete, 'écriture refusée'));
   }));
 }
 
-export const lire = (cle) => transaction('readonly', (magasin) => magasin.get(cle));
-export const ecrire = (cle, blob) => transaction('readwrite', (m) => m.put(blob, cle));
-export const supprimer = (cle) => transaction('readwrite', (m) => m.delete(cle));
-export const clefs = () => transaction('readonly', (m) => m.getAllKeys());
+/** Passe en réserve mémoire dès qu'IndexedDB se dérobe, une fois pour toutes. */
+async function avecRepli(action, actionMemoire) {
+  if (repliMemoire) return actionMemoire();
+  try {
+    return await action();
+  } catch (erreur) {
+    console.info('Photos conservées en mémoire seulement', erreur);
+    repliMemoire = true;
+    return actionMemoire();
+  }
+}
+
+export const lire = (cle) => avecRepli(
+  () => transaction('readonly', (m) => m.get(cle)),
+  () => memoire.get(cle),
+);
+export const ecrire = (cle, blob) => avecRepli(
+  () => transaction('readwrite', (m) => m.put(blob, cle)),
+  () => { memoire.set(cle, blob); },
+);
+export const supprimer = (cle) => avecRepli(
+  () => transaction('readwrite', (m) => m.delete(cle)),
+  () => { memoire.delete(cle); },
+);
+export const clefs = () => avecRepli(
+  () => transaction('readonly', (m) => m.getAllKeys()),
+  () => [...memoire.keys()],
+);
 
 /** Réduit une image choisie ou photographiée avant de la stocker. */
 export async function redimensionner(fichier) {
   const bitmap = await creerBitmap(fichier);
-  const facteur = Math.min(1, COTE_MAX / Math.max(bitmap.width, bitmap.height));
-  const largeur = Math.round(bitmap.width * facteur);
-  const hauteur = Math.round(bitmap.height * facteur);
+  const source = Math.max(bitmap.width || 0, bitmap.height || 0);
+  if (!source) return fichier;
+
+  const facteur = Math.min(1, COTE_MAX / source);
+  const largeur = Math.max(1, Math.round(bitmap.width * facteur));
+  const hauteur = Math.max(1, Math.round(bitmap.height * facteur));
 
   const toile = document.createElement('canvas');
   toile.width = largeur;
   toile.height = hauteur;
-  toile.getContext('2d').drawImage(bitmap, 0, 0, largeur, hauteur);
+  const contexte = toile.getContext('2d');
+  if (!contexte) return fichier;
+  contexte.drawImage(bitmap, 0, 0, largeur, hauteur);
   if (bitmap.close) bitmap.close();
 
-  const blob = await new Promise((r) => toile.toBlob(r, 'image/jpeg', QUALITE));
+  // toBlob rend null quand la conversion échoue : la photo d'origine fait
+  // alors très bien l'affaire.
+  const blob = await new Promise((r) => {
+    try {
+      toile.toBlob(r, 'image/jpeg', QUALITE);
+    } catch {
+      r(null);
+    }
+  });
   return blob || fichier;
 }
 
@@ -92,7 +162,12 @@ export function oublier(cle) {
 }
 
 export async function enregistrer(fichier) {
-  const blob = await redimensionner(fichier);
+  // Une photo d'iPhone peut être en HEIC, très grande, ou refuser de se
+  // décoder : on garde alors le fichier tel quel plutôt que d'abandonner.
+  const blob = await redimensionner(fichier).catch((erreur) => {
+    console.info('Photo conservée sans réduction', erreur);
+    return fichier;
+  });
   const cle = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   await ecrire(cle, blob);
   return cle;
@@ -123,6 +198,7 @@ export async function vider() {
     oublier(cle);
     await supprimer(cle);
   }
+  memoire.clear();
 }
 
 function versDataUrl(blob) {

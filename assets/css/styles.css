@@ -1127,3 +1127,16 @@ select {
   .libelle-large { display: inline; }
   .bouton-ajouter { padding-inline: 0.85rem; }
 }
+
+/* Avertissement permanent quand le navigateur refuse le stockage durable. */
+.bandeau-alerte {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: 0.6rem max(0.9rem, env(safe-area-inset-left));
+  background: var(--alerte-fond);
+  color: var(--alerte);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  border-bottom: 1px solid color-mix(in srgb, var(--alerte) 35%, transparent);
+}

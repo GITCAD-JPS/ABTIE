@@ -50,12 +50,20 @@ function lireLocal(cle) {
   }
 }
 
+let stockageRefuse = false;
+
+/** Le navigateur refuse-t-il de garder la cave d'une visite à l'autre ? */
+export const stockageDurable = () => !stockageRefuse;
+
 function ecrireLocal(cle, valeur) {
   try {
     localStorage.setItem(cle, JSON.stringify(valeur));
     return true;
   } catch (erreur) {
+    // Navigation privée, cadre d'un autre site, quota atteint : la cave
+    // continue de fonctionner mais ne survivra pas à la fermeture.
     console.error('Écriture impossible dans le stockage local', erreur);
+    stockageRefuse = true;
     return false;
   }
 }

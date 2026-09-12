@@ -143,8 +143,13 @@ async function traiterPhoto(fichier, naviguer) {
     etat.apercu = await photos.url(etat.photoLocale);
   } catch (erreur) {
     console.error(erreur);
-    message("La photo n'a pas pu être enregistrée", 'erreur');
+    const raison = erreur?.name === 'NotReadableError' ? 'fichier illisible'
+      : erreur?.message || 'raison inconnue';
+    message(`Photo non enregistrée : ${raison}`, 'erreur');
     return;
+  }
+  if (photos.enMemoire()) {
+    message('Photos gardées le temps de la session : ce navigateur refuse le stockage durable');
   }
   if (store.preferences().lectureAuto) {
     await lancerLecture(naviguer);
