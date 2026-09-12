@@ -1,23 +1,28 @@
 // Lecture d'une photo d'étiquette et rapprochement avec la cave.
 //
 // La reconnaissance de texte tourne entièrement dans le navigateur, par
-// Tesseract chargé à la demande depuis un CDN. Rien n'est envoyé nulle part.
+// Tesseract embarqué sous assets/vendor/tesseract. Rien n'est envoyé nulle
+// part, et rien n'est chargé depuis un site tiers : la lecture fonctionne
+// donc hors ligne dans la cave, et aucun hébergeur ne peut la bloquer.
+//
 // Une étiquette de vin reste un exercice difficile pour un moteur de texte :
 // le résultat sert à proposer, jamais à décider. Tout reste corrigeable, et
-// si le moteur ne peut pas être chargé, les parcours photo fonctionnent
-// quand même, sans préremplissage.
+// si le moteur ne peut pas démarrer, les parcours photo fonctionnent quand
+// même, sans préremplissage.
 
 import { sansAccent } from './model.js';
 
-const SOURCE_TESSERACT = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-const LANGUES = 'fra+ita';
-// Le moteur va chercher son ouvrier, son cœur et ses données de langue par
-// des requêtes à lui. Un hébergeur restrictif peut les bloquer sans erreur :
-// la promesse ne se résout alors jamais. Ce délai garantit qu'on rend la main.
-const DELAI_MAX = 30000;
+const DOSSIER = 'assets/vendor/tesseract';
+const SOURCE_TESSERACT = `${DOSSIER}/tesseract.min.js`;
+const LANGUES = ['fra', 'ita'];
+// Le moteur charge un ouvrier, un cœur WebAssembly et ses données de langue.
+// Même servis depuis le même site, cela peut échouer : ce délai garantit
+// qu'on rend la main plutôt que de laisser tourner indéfiniment.
+const DELAI_MAX = 45000;
 
 let chargement = null;
 let indisponible = false;
+const languesChargees = new Map();
 
 /** La lecture a-t-elle déjà échoué au point de ne plus valoir la peine ? */
 export const lectureIndisponible = () => indisponible;
@@ -43,6 +48,27 @@ function chargerMoteur() {
 }
 
 /**
+ * Charge les données d'une langue et rend ce que le moteur attend.
+ *
+ * Elles sont stockées en base64 dans du JSON plutôt qu'en `.traineddata.gz`
+ * brut : certains hébergeurs ne servent que les types web usuels et refusent
+ * les binaires. Les octets sont fournis directement au moteur, ce qui évite
+ * de lui faire télécharger quoi que ce soit.
+ */
+async function chargerLangue(code) {
+  if (languesChargees.has(code)) return languesChargees.get(code);
+  const reponse = await fetch(`${DOSSIER}/langues/${code}.traineddata.gz.json`);
+  if (!reponse.ok) throw new Error(`langue ${code} introuvable (${reponse.status})`);
+  const base64 = await reponse.json();
+  const binaire = atob(base64);
+  const octets = new Uint8Array(binaire.length);
+  for (let i = 0; i < binaire.length; i += 1) octets[i] = binaire.charCodeAt(i);
+  const langue = { code, data: octets };
+  languesChargees.set(code, langue);
+  return langue;
+}
+
+/**
  * Lit le texte d'une photo d'étiquette.
  * `onProgres` reçoit une fraction entre 0 et 1.
  * Renvoie null si la lecture n'a pas pu se faire, sans jamais rester en plan.
@@ -52,8 +78,18 @@ export async function lireEtiquette(image, { onProgres } = {}) {
   let minuteur = null;
 
   const reconnaitre = async () => {
-    const moteur = await chargerMoteur();
-    ouvrier = await moteur.createWorker(LANGUES, 1, {
+    const [moteur, ...langues] = await Promise.all([
+      chargerMoteur(),
+      ...LANGUES.map(chargerLangue),
+    ]);
+    // Tout vient du dossier embarqué. `corePath` désigne le dossier :
+    // Tesseract y choisit lui-même la variante SIMD ou son repli. Les
+    // données de langue lui sont passées telles quelles, il n'a donc rien à
+    // aller chercher ni à mettre dans son propre cache.
+    ouvrier = await moteur.createWorker(langues, 1, {
+      workerPath: `${DOSSIER}/worker.min.js`,
+      corePath: DOSSIER,
+      cacheMethod: 'none',
       logger: (etat) => {
         if (etat.status === 'recognizing text' && onProgres) onProgres(etat.progress);
       },

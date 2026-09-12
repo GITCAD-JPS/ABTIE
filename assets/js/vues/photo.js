@@ -122,7 +122,8 @@ function zonePhoto(naviguer) {
       el('p', {
         class: 'discret',
         text: 'La reconnaissance se fait dans le téléphone, rien n’est envoyé en ligne. '
-          + 'Le moteur se télécharge à la première utilisation, puis reste en mémoire.',
+          + 'Le moteur pèse une dizaine de méga-octets : il est chargé à la première '
+          + 'lecture, puis gardé en cache, y compris hors ligne.',
       }),
       el('button', {
         type: 'button', class: 'bouton-lien', text: 'Continuer sans lire',
