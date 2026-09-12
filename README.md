@@ -44,7 +44,7 @@ d'étiquettes et 21 dégustations.
 - Raccourci vers les fiches dont la quantité, l'emplacement ou la couleur reste à confirmer
 
 **Le reste**
-- Fonctionne hors ligne, installable sur l'écran d'accueil du téléphone
+- Fonctionne hors ligne, lecture d'étiquette comprise, installable sur l'écran d'accueil
 - Thème clair, sombre ou celui du système
 - Sauvegarde complète en JSON, export des vins et des dégustations en CSV lisible par Excel
 - Aucune donnée n'est envoyée en ligne : tout reste dans le navigateur
@@ -87,12 +87,20 @@ Puis ouvrir http://localhost:8000 dans un navigateur.
 
 Les deux parcours photo proposent de lire l'étiquette pour préremplir la fiche
 ou reconnaître la bouteille. La reconnaissance tourne entièrement dans le
-navigateur, par Tesseract chargé à la demande : aucune photo ne quitte
-l'appareil.
+navigateur : aucune photo ne quitte l'appareil, et aucune requête ne part vers
+un site tiers.
 
-Le moteur pèse plusieurs méga-octets, il n'est donc pas téléchargé sans
-raison. À la première photo, l'application propose de lire l'étiquette. Une
-fois la lecture réussie, les suivantes sont lues sans rien demander.
+Le moteur, Tesseract, est **embarqué** sous `assets/vendor/tesseract` plutôt
+que chargé depuis un CDN. Cela coûte une dizaine de méga-octets dans le dépôt,
+en échange de deux choses qui comptent ici : la lecture fonctionne **hors
+ligne**, ce qui est le cas ordinaire dans une cave, et elle ne dépend d'aucun
+hébergeur susceptible de bloquer ces requêtes. Le détail des fichiers et leur
+provenance sont dans `assets/vendor/tesseract/PROVENANCE.md`, et
+`tools/preparer_moteur.py` régénère le tout depuis npm.
+
+Le moteur n'est pas préchargé : la plupart des consultations ne lisent aucune
+étiquette. Il est chargé à la première lecture, puis gardé en cache par le
+service worker, y compris pour l'usage hors ligne.
 
 Ce que donne la lecture, mesuré sur des étiquettes de cette cave :
 
@@ -103,9 +111,10 @@ Ce que donne la lecture, mesuré sur des étiquettes de cette cave :
 | Vignette de moins de 300 px | Inexploitable |
 
 Autrement dit : une photo prise de près avec un téléphone fonctionne, une
-vignette récupérée ailleurs non. Quand la lecture échoue, ou que le moteur ne
-peut pas être chargé, le parcours continue sans lui : la photo est conservée
-et la recherche manuelle prend le relais.
+vignette récupérée ailleurs non. Quand la lecture échoue, le parcours continue
+sans elle : la photo est conservée et la recherche manuelle prend le relais.
+Un délai maximum garantit que la main est rendue, et un bouton permet de
+renoncer sans attendre.
 
 ## Où sont les données
 
@@ -171,6 +180,7 @@ index.html                 coquille de la page et jeu d'icônes SVG
 manifest.webmanifest       description de l'application installable
 sw.js                      service worker : mise en cache pour l'hors ligne
 assets/css/styles.css      feuille de style unique, mobile d'abord
+assets/vendor/tesseract/   moteur de reconnaissance embarqué, hors ligne compris
 assets/js/
   app.js                   routage par ancre, navigation, démarrage
   model.js                 normalisation, champs dérivés, filtres, statistiques

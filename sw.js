@@ -1,7 +1,7 @@
 /* Service worker : la cave reste consultable sans réseau, y compris au sous-sol.
    Changez VERSION à chaque modification des fichiers pour forcer la mise à jour. */
 
-const VERSION = 'cave-a-vin-v5';
+const VERSION = 'cave-a-vin-v7';
 
 const COQUILLE = [
   './',
@@ -26,6 +26,7 @@ const COQUILLE = [
   './assets/js/vues/photo.js',
   './assets/js/vues/reglages.js',
   './assets/js/vues/statistiques.js',
+  './assets/vendor/tesseract/tesseract.min.js',
   './assets/icons/icone.svg',
   './assets/icons/icone-180.png',
   './assets/icons/icone-192.png',
@@ -41,6 +42,14 @@ self.addEventListener('install', (evenement) => {
     await self.skipWaiting();
   })());
 });
+
+/**
+ * Le moteur de lecture pèse une dizaine de méga-octets : le précharger
+ * imposerait cette attente à la première ouverture, alors que la plupart des
+ * consultations ne lisent aucune étiquette. Il est donc mis en cache à la
+ * première lecture, par la règle générale du gestionnaire de requêtes, et
+ * reste disponible hors ligne ensuite.
+ */
 
 /** Met les étiquettes du classeur en cache, sans faire échouer l'installation. */
 async function precacherPhotos(cache) {
