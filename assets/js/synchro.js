@@ -21,7 +21,11 @@ let etatCourant = 'local';
 const enAttente = [];
 let repriseProgrammee = null;
 
-/** 'local' sans stockage partagé, 'connecte' quand il répond, 'attente' sinon. */
+/**
+ * 'local' quand la page tourne là où aucun partage n'existe, 'horsCompte'
+ * quand l'hébergeur en offre un mais le refuse à ce visiteur, 'connecte' quand
+ * il répond, 'attente' quand il ne répond plus.
+ */
 export const etat = () => etatCourant;
 export const synchroActive = () => Boolean(base);
 
@@ -49,7 +53,13 @@ export async function initialiser({ donneesLocales, onDonnees, onEtat }) {
     console.info('Stockage partagé indisponible', erreur);
     base = null;
   }
-  if (!base) return false;
+  // L'hébergeur offre un partage mais le refuse à ce visiteur : le plus souvent
+  // parce qu'il n'est pas connecté à son compte. Le dire vaut mieux que laisser
+  // croire que l'application ne sait pas partager.
+  if (!base) {
+    changerEtat('horsCompte');
+    return false;
+  }
 
   try {
     await amorcer(donneesLocales());

@@ -48,7 +48,7 @@ export function rendre(conteneur, { naviguer }) {
     if (e.key === 'Enter' || e.key === ' ') entreeImport.click();
   });
 
-  conteneur.append(el('div', { class: 'vue-reglages' }, [
+  const racine = el('div', { class: 'vue-reglages' }, [
     el('header', { class: 'entete-vue' }, [el('h1', { text: 'Réglages' })]),
 
     section('Apparence', el('div', { class: 'grille-deux' }, [
@@ -68,11 +68,11 @@ export function rendre(conteneur, { naviguer }) {
     section('Sauvegarde', [
       el('p', {
         class: 'discret',
-        text: store.etatSynchro() === 'local'
-          ? 'La cave est enregistrée dans ce navigateur. Exportez une sauvegarde avant '
-            + 'de changer d’appareil ou de vider les données du navigateur.'
-          : 'La cave est partagée entre les appareils qui y ont accès. Une sauvegarde '
-            + 'reste utile pour garder une copie hors de l’application.',
+        text: store.partageBranche()
+          ? 'La cave est partagée entre les appareils qui y ont accès. Une sauvegarde '
+            + 'reste utile pour garder une copie hors de l’application.'
+          : 'La cave est enregistrée dans ce navigateur. Exportez une sauvegarde avant '
+            + 'de changer d’appareil ou de vider les données du navigateur.',
       }),
       el('div', { class: 'rangee-boutons' }, [
         bouton('Sauvegarde complète (JSON)', {
@@ -129,13 +129,35 @@ export function rendre(conteneur, { naviguer }) {
       el('dd', { text: String(store.degustations().length) }),
       el('dt', { text: 'Stockage' }),
       el('dd', {
-        text: store.etatSynchro() === 'local'
-          ? 'Ce navigateur seulement, aucune donnée envoyée en ligne'
-          : 'Ce navigateur, et un espace partagé rattaché à votre compte, ouvert '
-            + 'aux appareils que vous avez autorisés',
+        text: store.partageBranche()
+          ? 'Ce navigateur, et un espace partagé rattaché à votre compte, ouvert '
+            + 'aux appareils que vous avez autorisés'
+          : 'Ce navigateur seulement, aucune donnée envoyée en ligne',
       }),
     ])),
-  ]));
+  ]);
+
+  conteneur.append(racine);
+  suivreSynchro(racine, naviguer);
+}
+
+/**
+ * Redessine la page quand la synchronisation change d'état.
+ *
+ * Le partage se branche une seconde après l'affichage. Sans cela, quelqu'un
+ * qui ouvre les réglages au démarrage lirait « Cet appareil seulement » alors
+ * que la cave vient justement de se connecter : c'est l'écran qu'on consulte
+ * pour comprendre, il ne peut pas être celui qui trompe.
+ */
+function suivreSynchro(racine, naviguer) {
+  let dernier = store.etatSynchro();
+  const desabonner = store.abonner(() => {
+    if (!racine.isConnected) { desabonner(); return; }
+    if (store.etatSynchro() === dernier) return;
+    dernier = store.etatSynchro();
+    desabonner();
+    naviguer(null);
+  });
 }
 
 /**
@@ -165,6 +187,12 @@ const ETATS_SYNCHRO = {
     titre: 'En attente',
     texte: 'Le partage ne répond pas pour le moment. Vos modifications sont '
       + 'conservées ici et seront envoyées dès que possible.',
+  },
+  horsCompte: {
+    titre: 'Connexion requise',
+    texte: 'Le partage passe par un compte, et cet appareil n’y est pas '
+      + 'connecté. La cave reste donc dans ce navigateur. Connectez-vous '
+      + 'depuis le bandeau en haut de la page, puis rouvrez le lien.',
   },
   local: {
     titre: 'Cet appareil seulement',

@@ -1187,3 +1187,4 @@ select {
 
 .pastille-synchro.connecte { background: var(--accent-doux); color: var(--accent); }
 .pastille-synchro.attente { background: var(--alerte-fond); color: var(--alerte); }
+.pastille-synchro.horsCompte { background: var(--alerte-fond); color: var(--alerte); }

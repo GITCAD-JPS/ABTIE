@@ -34,6 +34,8 @@ function notifier() {
 
 export const donnees = () => etat;
 export const etatSynchro = () => synchro.etat();
+/** Le partage est-il réellement branché, quel que soit son état du moment ? */
+export const partageBranche = () => synchro.synchroActive();
 export const vins = () => etat.vins;
 export const degustations = () => etat.degustations;
 export const preferences = () => etat.preferences;

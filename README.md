@@ -148,8 +148,13 @@ suffisent à reconnaître une étiquette, et l'originale reste dans le navigateu
 qui l'a prise.
 
 Une modification faite hors réseau est conservée et envoyée à la reprise. Les
-réglages indiquent où en est la synchronisation : active, en attente, ou
-absente.
+réglages indiquent où en est la synchronisation, et distinguent quatre
+situations : active, en attente de réseau, impossible ici faute de stockage
+partagé, ou refusée à ce visiteur parce qu'il n'est pas connecté à son compte.
+Ce dernier cas est le piège : l'application sait partager, c'est l'hébergeur
+qui ferme la porte, et annoncer « cet appareil seulement » ferait chercher au
+mauvais endroit. La page se redessine quand l'état change, le partage se
+branchant une seconde après l'affichage.
 
 Le partage ne se limite pas aux appareils d'une seule personne. Chez un
 hébergeur qui distingue les niveaux d'accès, la cave n'est lisible et
