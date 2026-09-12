@@ -63,11 +63,17 @@ export function rendre(conteneur, { naviguer }) {
       ]),
     ])),
 
+    section('Synchronisation', [etatSynchronisation()]),
+
     section('Sauvegarde', [
-      el('p', { class: 'discret' }, [
-        'La cave est enregistrée dans ce navigateur. Exportez une sauvegarde avant de ',
-        'changer d’appareil ou de vider les données du navigateur.',
-      ]),
+      el('p', {
+        class: 'discret',
+        text: store.etatSynchro() === 'local'
+          ? 'La cave est enregistrée dans ce navigateur. Exportez une sauvegarde avant '
+            + 'de changer d’appareil ou de vider les données du navigateur.'
+          : 'La cave est partagée entre vos appareils. Une sauvegarde reste utile pour '
+            + 'garder une copie hors de l’application.',
+      }),
       el('div', { class: 'rangee-boutons' }, [
         bouton('Sauvegarde complète (JSON)', {
           classe: 'bouton bouton-primaire',
@@ -121,9 +127,41 @@ export function rendre(conteneur, { naviguer }) {
       el('dt', { text: 'Dégustations' }),
       el('dd', { text: String(store.degustations().length) }),
       el('dt', { text: 'Stockage' }),
-      el('dd', { text: 'Navigateur (localStorage et IndexedDB), aucune donnée envoyée en ligne' }),
+      el('dd', {
+        text: store.etatSynchro() === 'local'
+          ? 'Ce navigateur seulement, aucune donnée envoyée en ligne'
+          : 'Ce navigateur, et un espace partagé rattaché à votre compte pour '
+            + 'que vos appareils se retrouvent',
+      }),
     ])),
   ]));
+}
+
+const ETATS_SYNCHRO = {
+  connecte: {
+    titre: 'Active',
+    texte: 'La cave est partagée entre vos appareils. Une bouteille ouverte '
+      + "sur l'un apparaît sur l'autre en quelques secondes.",
+  },
+  attente: {
+    titre: 'En attente',
+    texte: 'Le partage ne répond pas pour le moment. Vos modifications sont '
+      + 'conservées ici et seront envoyées dès que possible.',
+  },
+  local: {
+    titre: 'Cet appareil seulement',
+    texte: 'Cette version de l’application ne partage rien : la cave vit dans '
+      + 'ce navigateur. Passez par une sauvegarde pour la transporter.',
+  },
+};
+
+function etatSynchronisation() {
+  const etat = store.etatSynchro();
+  const { titre, texte } = ETATS_SYNCHRO[etat] || ETATS_SYNCHRO.local;
+  return el('div', { class: 'synchro' }, [
+    el('span', { class: `pastille-synchro ${etat}`, text: titre }),
+    el('p', { class: 'discret', text: texte }),
+  ]);
 }
 
 function dateLisible(iso) {

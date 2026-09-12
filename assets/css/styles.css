@@ -1160,3 +1160,30 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .progression-piste.indeterminee { animation: none; }
 }
+
+/* --- état de la synchronisation ------------------------------------------ */
+
+.synchro { display: flex; flex-direction: column; gap: 0.45rem; align-items: flex-start; }
+
+.pastille-synchro {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--fond-doux);
+  color: var(--texte-doux);
+}
+
+.pastille-synchro::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.pastille-synchro.connecte { background: var(--accent-doux); color: var(--accent); }
+.pastille-synchro.attente { background: var(--alerte-fond); color: var(--alerte); }
