@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Cave à vin">
+  <rect width="64" height="64" rx="14" fill="#7c1f2e"/>
+  <path d="M26 12h12v13.5a9 9 0 0 1-2.1 5.8L34 33.6V50h-4V33.6l-1.9-2.3a9 9 0 0 1-2.1-5.8Z"
+        fill="none" stroke="#faf7f3" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M26 21h12" stroke="#faf7f3" stroke-width="3" stroke-linecap="round"/>
+  <path d="M24 52h16" stroke="#faf7f3" stroke-width="3" stroke-linecap="round"/>
+</svg>

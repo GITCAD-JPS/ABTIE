@@ -1,0 +1,98 @@
+/* Service worker : la cave reste consultable sans réseau, y compris au sous-sol.
+   Changez VERSION à chaque modification des fichiers pour forcer la mise à jour. */
+
+const VERSION = 'cave-a-vin-v1';
+
+const COQUILLE = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './assets/css/styles.css',
+  './assets/js/app.js',
+  './assets/js/composants.js',
+  './assets/js/dom.js',
+  './assets/js/export.js',
+  './assets/js/formulaires.js',
+  './assets/js/model.js',
+  './assets/js/photos.js',
+  './assets/js/store.js',
+  './assets/js/theme.js',
+  './assets/js/vues/cave.js',
+  './assets/js/vues/degustations.js',
+  './assets/js/vues/fiche.js',
+  './assets/js/vues/reglages.js',
+  './assets/js/vues/statistiques.js',
+  './assets/icons/icone.svg',
+  './assets/icons/icone-180.png',
+  './assets/icons/icone-192.png',
+  './assets/icons/icone-512.png',
+  './data/seed.json',
+];
+
+self.addEventListener('install', (evenement) => {
+  evenement.waitUntil((async () => {
+    const cache = await caches.open(VERSION);
+    await cache.addAll(COQUILLE);
+    await precacherPhotos(cache);
+    await self.skipWaiting();
+  })());
+});
+
+/** Met les étiquettes du classeur en cache, sans faire échouer l'installation. */
+async function precacherPhotos(cache) {
+  try {
+    const reponse = await cache.match('./data/seed.json') || await fetch('./data/seed.json');
+    const seed = await reponse.json();
+    const chemins = [...(seed.vins || []), ...(seed.degustations || [])]
+      .map((fiche) => fiche.photo)
+      .filter(Boolean)
+      .map((chemin) => `./${chemin}`);
+    await Promise.allSettled(chemins.map((chemin) => cache.add(chemin)));
+  } catch (erreur) {
+    console.info('Photos non mises en cache', erreur);
+  }
+}
+
+self.addEventListener('activate', (evenement) => {
+  evenement.waitUntil((async () => {
+    const noms = await caches.keys();
+    await Promise.all(noms.filter((nom) => nom !== VERSION).map((nom) => caches.delete(nom)));
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener('fetch', (evenement) => {
+  const requete = evenement.request;
+  if (requete.method !== 'GET' || !requete.url.startsWith(self.location.origin)) return;
+
+  // Navigation : on tente le réseau puis on retombe sur la page mise en cache.
+  if (requete.mode === 'navigate') {
+    evenement.respondWith((async () => {
+      try {
+        return await fetch(requete);
+      } catch {
+        return (await caches.match('./index.html')) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  evenement.respondWith((async () => {
+    const cache = await caches.open(VERSION);
+    const enCache = await cache.match(requete);
+    if (enCache) {
+      // Rafraîchissement discret en arrière-plan.
+      fetch(requete).then((reponse) => {
+        if (reponse.ok) cache.put(requete, reponse.clone());
+      }).catch(() => {});
+      return enCache;
+    }
+    try {
+      const reponse = await fetch(requete);
+      if (reponse.ok) cache.put(requete, reponse.clone());
+      return reponse;
+    } catch (erreur) {
+      return Response.error();
+    }
+  })());
+});
