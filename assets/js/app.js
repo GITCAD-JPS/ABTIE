@@ -137,6 +137,7 @@ async function demarrer() {
   store.abonner(installerSuggestions);
 
   document.body.classList.remove('chargement');
+  avertirSiStockageRefuse();
   rendre();
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -144,6 +145,22 @@ async function demarrer() {
       console.info('Mode hors ligne indisponible', erreur);
     });
   }
+}
+
+/**
+ * Certains navigateurs refusent de garder quoi que ce soit à une page
+ * affichée dans le cadre d'un autre site, ou en navigation privée. Mieux vaut
+ * le dire franchement que de laisser perdre une soirée de saisie.
+ */
+function avertirSiStockageRefuse() {
+  if (store.stockageDurable()) return;
+  document.body.prepend(el('div', { class: 'bandeau-alerte', role: 'status' }, [
+    el('strong', { text: 'Vos modifications ne seront pas conservées. ' }),
+    el('span', {
+      text: 'Ce navigateur refuse le stockage à cette page. Exportez une '
+        + 'sauvegarde depuis les réglages avant de fermer.',
+    }),
+  ]));
 }
 
 window.addEventListener('error', (evenement) => {
