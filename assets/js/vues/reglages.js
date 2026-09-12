@@ -77,17 +77,18 @@ export function rendre(conteneur, { naviguer }) {
       el('div', { class: 'rangee-boutons' }, [
         bouton('Sauvegarde complète (JSON)', {
           classe: 'bouton bouton-primaire',
-          onclick: async () => {
-            await exporter.sauvegardeComplete();
-            message('Sauvegarde téléchargée');
-          },
+          onclick: () => remettre(exporter.sauvegardeComplete, 'Sauvegarde enregistrée'),
         }),
         declencheurImport,
         entreeImport,
       ]),
       el('div', { class: 'rangee-boutons' }, [
-        bouton('Exporter les vins (CSV)', { onclick: () => exporter.exportVinsCsv() }),
-        bouton('Exporter les dégustations (CSV)', { onclick: () => exporter.exportDegustationsCsv() }),
+        bouton('Exporter les vins (CSV)', {
+          onclick: () => remettre(exporter.exportVinsCsv, 'Liste des vins enregistrée'),
+        }),
+        bouton('Exporter les dégustations (CSV)', {
+          onclick: () => remettre(exporter.exportDegustationsCsv, 'Journal enregistré'),
+        }),
       ]),
       el('p', { class: 'discret', text: etat.majLe ? `Dernière modification : ${dateLisible(etat.majLe)}` : '' }),
     ]),
@@ -135,6 +136,22 @@ export function rendre(conteneur, { naviguer }) {
       }),
     ])),
   ]));
+}
+
+/**
+ * Remet un fichier et ne dit « c'est fait » que si ça l'est.
+ *
+ * Selon l'endroit où tourne l'application, l'enregistrement passe par le
+ * navigateur ou par l'hébergeur, qui demande alors confirmation. Un refus se
+ * passe de commentaire, la personne vient de le formuler.
+ */
+async function remettre(action, reussite) {
+  try {
+    if (await action() === 'enregistre') message(reussite);
+  } catch (erreur) {
+    console.error(erreur);
+    message(`Enregistrement impossible : ${erreur.message}`, 'erreur');
+  }
 }
 
 const ETATS_SYNCHRO = {

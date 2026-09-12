@@ -49,8 +49,45 @@ export function csvDesDegustations(degustations) {
   return versCsv(entetes, lignes);
 }
 
-export function telecharger(nomFichier, contenu, type) {
+// Traduction des refus de l'hébergeur, pour dire ce qui s'est passé plutôt
+// que d'afficher un code en anglais.
+const RAISONS = {
+  too_large: 'le fichier est trop volumineux',
+  rate_limited: 'une demande est déjà en cours, réessayez dans un instant',
+  rejected_extension: 'ce format de fichier n’est pas accepté ici',
+  extension_not_enabled: 'ce format de fichier n’est pas accepté ici',
+  unavailable: 'l’enregistrement de fichiers est indisponible ici',
+  not_granted: 'l’enregistrement de fichiers n’a pas été autorisé',
+};
+
+/**
+ * Remet un fichier à la personne qui l'a demandé.
+ *
+ * Une page d'artefact ne peut pas déclencher un téléchargement elle-même : le
+ * lien reste inerte, sans la moindre erreur, et l'application croirait avoir
+ * réussi. L'hébergeur offre pour cela une remise qui demande confirmation.
+ * Ailleurs, un lien ordinaire fait très bien l'affaire.
+ *
+ * Rend 'enregistre', ou 'refuse' si la personne décline. Lève dans tous les
+ * autres cas, pour qu'aucun appelant n'annonce une sauvegarde qui n'a pas eu
+ * lieu.
+ */
+export async function telecharger(nomFichier, contenu, type) {
   const blob = contenu instanceof Blob ? contenu : new Blob([contenu], { type });
+  const use = globalThis.claude?.use;
+
+  if (typeof use === 'function') {
+    const remise = await use('downloads').catch(() => null);
+    if (!remise) throw new Error(RAISONS.unavailable);
+    try {
+      await remise.save({ filename: nomFichier, data: blob });
+      return 'enregistre';
+    } catch (erreur) {
+      if (erreur?.code === 'declined') return 'refuse';
+      throw new Error(RAISONS[erreur?.code] || erreur?.message || 'raison inconnue');
+    }
+  }
+
   const url = URL.createObjectURL(blob);
   const lien = document.createElement('a');
   lien.href = url;
@@ -59,23 +96,24 @@ export function telecharger(nomFichier, contenu, type) {
   lien.click();
   lien.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return 'enregistre';
 }
 
 const horodatage = () => new Date().toISOString().slice(0, 10);
 
 export async function sauvegardeComplete() {
   const paquet = await store.exporterJson({ avecPhotos: true });
-  telecharger(`cave-a-vin-${horodatage()}.json`,
+  return telecharger(`cave-a-vin-${horodatage()}.json`,
     JSON.stringify(paquet, null, 1), 'application/json');
 }
 
 export function exportVinsCsv() {
-  telecharger(`cave-a-vin-${horodatage()}.csv`,
+  return telecharger(`cave-a-vin-${horodatage()}.csv`,
     csvDesVins(store.vins()), 'text/csv;charset=utf-8');
 }
 
 export function exportDegustationsCsv() {
-  telecharger(`degustations-${horodatage()}.csv`,
+  return telecharger(`degustations-${horodatage()}.csv`,
     csvDesDegustations(store.degustations()), 'text/csv;charset=utf-8');
 }
 

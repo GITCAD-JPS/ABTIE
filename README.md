@@ -178,6 +178,13 @@ ajoutées, que « Restaurer une sauvegarde » relit sur un autre appareil. Cette
 sauvegarde reste utile même avec la synchronisation, pour garder une copie
 hors de l'application.
 
+Un cadre d'artefact interdit à la page de déclencher un téléchargement : le
+lien y reste inerte, sans la moindre erreur, et l'application annoncerait une
+sauvegarde qui n'a pas eu lieu. `assets/js/export.js` passe donc par la remise
+de fichier de l'hébergeur quand elle existe, et par le lien ordinaire partout
+ailleurs. Dans les deux cas, le message de confirmation n'apparaît qu'une fois
+le fichier réellement remis, et un refus ne dit rien du tout.
+
 Vider les données de site du navigateur efface la cave. Une sauvegarde
 régulière est la seule protection.
 
