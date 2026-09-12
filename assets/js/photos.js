@@ -13,6 +13,9 @@ const BASE = 'cave-a-vin';
 const MAGASIN = 'photos';
 const COTE_MAX = 1400;
 const QUALITE = 0.82;
+// Une photo déposée chez l'hébergeur porte ce préfixe : elle suit alors la
+// cave d'un appareil à l'autre, au lieu de rester dans un seul navigateur.
+const PREFIXE_PARTAGE = 'a:';
 
 let connexion = null;
 let repliMemoire = false;
@@ -28,6 +31,22 @@ function erreurDe(requete, defaut) {
 }
 
 export const enMemoire = () => repliMemoire;
+
+let depotPartage;
+
+/** Dépôt de fichiers de l'hébergeur, quand il en offre un. */
+async function partage() {
+  if (depotPartage !== undefined) return depotPartage;
+  const use = globalThis.claude?.use;
+  depotPartage = typeof use === 'function'
+    ? await use('assets').catch(() => null)
+    : null;
+  return depotPartage;
+}
+
+const estPartagee = (cle) => String(cle || '').startsWith(PREFIXE_PARTAGE);
+const identifiantPartage = (cle) => String(cle).slice(PREFIXE_PARTAGE.length);
+const adressePartagee = (cle) => `/_blob/${identifiantPartage(cle)}`;
 
 function ouvrir() {
   if (connexion) return connexion;
@@ -86,15 +105,32 @@ async function avecRepli(action, actionMemoire) {
 export const lire = (cle) => avecRepli(
   () => transaction('readonly', (m) => m.get(cle)),
   () => memoire.get(cle),
-);
+).then((blob) => blob ?? (estPartagee(cle) ? recupererPartagee(cle) : undefined));
+
+/** Récupère une photo déposée chez l'hébergeur, pour la relire ou l'exporter. */
+async function recupererPartagee(cle) {
+  try {
+    const reponse = await fetch(adressePartagee(cle));
+    return reponse.ok ? await reponse.blob() : undefined;
+  } catch {
+    return undefined;
+  }
+}
 export const ecrire = (cle, blob) => avecRepli(
   () => transaction('readwrite', (m) => m.put(blob, cle)),
   () => { memoire.set(cle, blob); },
 );
-export const supprimer = (cle) => avecRepli(
-  () => transaction('readwrite', (m) => m.delete(cle)),
-  () => { memoire.delete(cle); },
-);
+export const supprimer = async (cle) => {
+  if (estPartagee(cle)) {
+    const depot = await partage();
+    await depot?.delete(identifiantPartage(cle)).catch(() => {});
+    return undefined;
+  }
+  return avecRepli(
+    () => transaction('readwrite', (m) => m.delete(cle)),
+    () => { memoire.delete(cle); },
+  );
+};
 export const clefs = () => avecRepli(
   () => transaction('readonly', (m) => m.getAllKeys()),
   () => [...memoire.keys()],
@@ -148,11 +184,15 @@ const urls = new Map();
 export async function url(cle) {
   if (!cle) return '';
   if (urls.has(cle)) return urls.get(cle);
+  // Une sauvegarde restaurée peut avoir remis une photo partagée dans ce
+  // navigateur : elle prime, elle est là et ne demande aucun réseau.
   const blob = await lire(cle).catch(() => null);
-  if (!blob) return '';
-  const objet = URL.createObjectURL(blob);
-  urls.set(cle, objet);
-  return objet;
+  if (blob) {
+    const objet = URL.createObjectURL(blob);
+    urls.set(cle, objet);
+    return objet;
+  }
+  return estPartagee(cle) ? adressePartagee(cle) : '';
 }
 
 export function oublier(cle) {
@@ -168,17 +208,37 @@ export async function enregistrer(fichier) {
     console.info('Photo conservée sans réduction', erreur);
     return fichier;
   });
+
+  // Déposée chez l'hébergeur, la photo apparaît sur les autres appareils.
+  // Sinon elle reste dans ce navigateur, ce qui vaut mieux que rien.
+  const depot = await partage();
+  if (depot) {
+    try {
+      const { id } = await depot.upload(blob);
+      return `${PREFIXE_PARTAGE}${id}`;
+    } catch (erreur) {
+      console.info('Photo conservée dans cet appareil seulement', erreur);
+    }
+  }
+
   const cle = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   await ecrire(cle, blob);
   return cle;
 }
 
-/** Convertit toutes les photos locales en data URL, pour la sauvegarde JSON. */
-export async function exporter() {
-  const liste = await clefs().catch(() => []);
+/**
+ * Convertit les photos en data URL, pour la sauvegarde JSON.
+ *
+ * `clesUtilisees` vient des fiches : une photo déposée chez l'hébergeur
+ * n'est pas dans ce navigateur, elle serait donc absente d'une sauvegarde
+ * établie à partir du seul contenu local.
+ */
+export async function exporter(clesUtilisees = []) {
+  const locales = await clefs().catch(() => []);
   const paquet = {};
-  for (const cle of liste) {
-    const blob = await lire(cle);
+  for (const cle of new Set([...locales, ...clesUtilisees])) {
+    if (!cle) continue;
+    const blob = await lire(cle).catch(() => null);
     if (blob) paquet[cle] = await versDataUrl(blob);
   }
   return paquet;

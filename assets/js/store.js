@@ -6,6 +6,7 @@ import {
   normaliserDegustation, normaliserVin,
 } from './model.js';
 import * as photos from './photos.js';
+import * as synchro from './synchro.js';
 
 const CLE_DONNEES = 'cave-a-vin.donnees.v1';
 const CLE_PREFERENCES = 'cave-a-vin.preferences.v1';
@@ -32,6 +33,7 @@ function notifier() {
 }
 
 export const donnees = () => etat;
+export const etatSynchro = () => synchro.etat();
 export const vins = () => etat.vins;
 export const degustations = () => etat.degustations;
 export const preferences = () => etat.preferences;
@@ -105,7 +107,39 @@ export async function charger() {
   }
   etat.charge = true;
   notifier();
+
+  // La cave s'affiche d'abord depuis le navigateur. Le stockage partagé, s'il
+  // existe, se branche ensuite et met les appareils d'accord.
+  synchro.initialiser({
+    donneesLocales: () => ({ vins: etat.vins, degustations: etat.degustations }),
+    onDonnees: appliquerDistant,
+    onEtat: notifier,
+  }).catch((erreur) => console.info('Synchronisation indisponible', erreur));
+
   return etat;
+}
+
+/**
+ * Adopte ce que disent les autres appareils.
+ *
+ * Un instantané vide alors que la cave locale est garnie signale une lecture
+ * incomplète plutôt qu'une cave réellement vidée : mieux vaut l'ignorer que
+ * d'effacer cent dix-neuf fiches sur un incident de réseau.
+ */
+function appliquerDistant(cle, fiches) {
+  if (cle === 'vins') {
+    if (!fiches.length && etat.vins.length) return;
+    etat.vins = fiches.map(normaliserVin);
+  } else {
+    etat.degustations = fiches.map(normaliserDegustation);
+  }
+  ecrireLocal(CLE_DONNEES, {
+    version: VERSION_DONNEES,
+    majLe: etat.majLe,
+    vins: etat.vins,
+    degustations: etat.degustations,
+  });
+  notifier();
 }
 
 export async function reinitialiser() {
@@ -114,6 +148,7 @@ export async function reinitialiser() {
   adopter(await reponse.json());
   await photos.vider().catch(() => {});
   enregistrer();
+  await synchro.remplacerTout(etat).catch(() => {});
 }
 
 // --- actions sur les vins ---------------------------------------------------
@@ -122,6 +157,7 @@ export function ajouterVin(champs) {
   const vin = normaliserVin({ ...champs, id: identifiant('v') });
   etat.vins.unshift(vin);
   enregistrer();
+  synchro.ecrireVin(vin);
   return vin;
 }
 
@@ -131,6 +167,7 @@ export function modifierVin(id, champs) {
   const vin = normaliserVin({ ...etat.vins[index], ...champs, id });
   etat.vins[index] = vin;
   enregistrer();
+  synchro.ecrireVin(vin);
   return vin;
 }
 
@@ -144,10 +181,16 @@ export function supprimerVin(id) {
   }
   etat.vins = etat.vins.filter((v) => v.id !== id);
   // Les dégustations gardent leur trace mais perdent le lien vers la fiche.
-  etat.degustations = etat.degustations.map((d) => (
-    d.vinId === id ? { ...d, vinId: '' } : d
-  ));
+  const detachees = [];
+  etat.degustations = etat.degustations.map((d) => {
+    if (d.vinId !== id) return d;
+    const detachee = { ...d, vinId: '' };
+    detachees.push(detachee);
+    return detachee;
+  });
   enregistrer();
+  synchro.effacerVin(id);
+  for (const d of detachees) synchro.ecrireDegustation(d);
   return true;
 }
 
@@ -220,6 +263,7 @@ export function boireBouteille(id, details = {}) {
     vinId: vin.id,
   });
   etat.degustations.unshift(degustation);
+  synchro.ecrireDegustation(degustation);
 
   modifierVin(id, {
     emplacements,
@@ -249,6 +293,7 @@ export function ajouterDegustation(champs) {
   const degustation = normaliserDegustation({ ...champs, id: identifiant('t') });
   etat.degustations.unshift(degustation);
   enregistrer();
+  synchro.ecrireDegustation(degustation);
   return degustation;
 }
 
@@ -258,6 +303,7 @@ export function modifierDegustation(id, champs) {
   const degustation = normaliserDegustation({ ...etat.degustations[index], ...champs, id });
   etat.degustations[index] = degustation;
   enregistrer();
+  synchro.ecrireDegustation(degustation);
   return degustation;
 }
 
@@ -270,6 +316,7 @@ export function supprimerDegustation(id) {
   }
   etat.degustations = etat.degustations.filter((d) => d.id !== id);
   enregistrer();
+  synchro.effacerDegustation(id);
   return true;
 }
 
@@ -282,13 +329,16 @@ function photoPartagee(cle, saufDegustation, saufVin) {
 // --- sauvegarde et restauration ---------------------------------------------
 
 export async function exporterJson({ avecPhotos = true } = {}) {
+  const clesPhotos = [...etat.vins, ...etat.degustations]
+    .map((fiche) => fiche.photoLocale)
+    .filter(Boolean);
   return {
     application: 'cave-a-vin',
     version: VERSION_DONNEES,
     exporteLe: new Date().toISOString(),
     vins: etat.vins,
     degustations: etat.degustations,
-    photos: avecPhotos ? await photos.exporter() : {},
+    photos: avecPhotos ? await photos.exporter(clesPhotos) : {},
   };
 }
 
@@ -299,5 +349,6 @@ export async function importerJson(paquet) {
   if (paquet.photos) await photos.importer(paquet.photos).catch(() => {});
   adopter(paquet);
   enregistrer();
+  await synchro.remplacerTout(etat).catch(() => {});
   return { vins: etat.vins.length, degustations: etat.degustations.length };
 }

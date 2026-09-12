@@ -116,6 +116,30 @@ sans elle : la photo est conservée et la recherche manuelle prend le relais.
 Un délai maximum garantit que la main est rendue, et un bouton permet de
 renoncer sans attendre.
 
+## Plusieurs appareils
+
+L'application est locale d'abord : elle lit et écrit dans le navigateur,
+s'affiche instantanément et fonctionne sans réseau. Quand la page tourne chez
+un hébergeur qui offre un stockage partagé, `assets/js/synchro.js` s'y branche
+en plus et les appareils se retrouvent. Deux iPhones ouvrant la même adresse
+voient alors la même cave, à quelques secondes près.
+
+Chaque vin et chaque dégustation est un document distinct. C'est ce qui permet
+à deux appareils de modifier la cave en même temps sans s'écraser : seuls des
+changements portant sur la même fiche entrent en conflit, et le dernier écrit
+l'emporte. Un document unique pour toute la cave aurait fait perdre le travail
+de l'un dès que l'autre touchait à quoi que ce soit.
+
+Les photos prises depuis l'application suivent le même chemin : déposées chez
+l'hébergeur quand c'est possible, gardées dans le navigateur sinon.
+
+Une modification faite hors réseau est conservée et envoyée à la reprise. Les
+réglages indiquent où en est la synchronisation : active, en attente, ou
+absente.
+
+Sans stockage partagé, rien ne change : la cave reste dans le navigateur et se
+transporte par une sauvegarde.
+
 ## Où sont les données
 
 Au premier lancement, l'application lit `data/seed.json` et le recopie dans le
@@ -128,10 +152,12 @@ navigateur. Ensuite, tout est lu et écrit localement :
 | `data/photos/` | Les 102 photos d'étiquettes issues du classeur |
 | `data/seed.json` | Le point de départ, jamais modifié par l'application |
 
-Comme les données vivent dans un seul navigateur, elles ne suivent pas d'un
-appareil à l'autre. Le bouton « Sauvegarde complète » des réglages télécharge
-un fichier JSON contenant les fiches et les photos ajoutées, que « Restaurer
-une sauvegarde » relit sur un autre appareil.
+Sans stockage partagé, les données vivent dans un seul navigateur et ne
+suivent pas d'un appareil à l'autre. Le bouton « Sauvegarde complète » des
+réglages télécharge un fichier JSON contenant les fiches et les photos
+ajoutées, que « Restaurer une sauvegarde » relit sur un autre appareil. Cette
+sauvegarde reste utile même avec la synchronisation, pour garder une copie
+hors de l'application.
 
 Vider les données de site du navigateur efface la cave. Une sauvegarde
 régulière est la seule protection.
@@ -185,6 +211,7 @@ assets/js/
   app.js                   routage par ancre, navigation, démarrage
   model.js                 normalisation, champs dérivés, filtres, statistiques
   store.js                 état, persistance, actions métier
+  synchro.js               partage de la cave entre appareils, quand il existe
   accords.js               profils de cépages et appellations, accords mets et vins
   etiquette.js             lecture d'une photo d'étiquette, rapprochement avec la cave
   photos.js                photos prises dans l'application (IndexedDB)
