@@ -122,15 +122,17 @@ export async function charger() {
 /**
  * Adopte ce que disent les autres appareils.
  *
- * Un instantané vide alors que la cave locale est garnie signale une lecture
+ * Un instantané vide alors que la liste locale est garnie signale une lecture
  * incomplète plutôt qu'une cave réellement vidée : mieux vaut l'ignorer que
- * d'effacer cent dix-neuf fiches sur un incident de réseau.
+ * d'effacer cent dix-neuf fiches sur un incident de réseau. Le prochain
+ * instantané ramènera le contenu réel.
  */
 function appliquerDistant(cle, fiches) {
   if (cle === 'vins') {
     if (!fiches.length && etat.vins.length) return;
     etat.vins = fiches.map(normaliserVin);
   } else {
+    if (!fiches.length && etat.degustations.length) return;
     etat.degustations = fiches.map(normaliserDegustation);
   }
   ecrireLocal(CLE_DONNEES, {
@@ -153,8 +155,11 @@ export async function reinitialiser() {
 
 // --- actions sur les vins ---------------------------------------------------
 
+/** Heure de la modification, telle que la voit l'appareil qui la fait. */
+const maintenant = () => new Date().toISOString();
+
 export function ajouterVin(champs) {
-  const vin = normaliserVin({ ...champs, id: identifiant('v') });
+  const vin = normaliserVin({ ...champs, id: identifiant('v'), modifieLe: maintenant() });
   etat.vins.unshift(vin);
   enregistrer();
   synchro.ecrireVin(vin);
@@ -164,7 +169,7 @@ export function ajouterVin(champs) {
 export function modifierVin(id, champs) {
   const index = etat.vins.findIndex((v) => v.id === id);
   if (index === -1) return null;
-  const vin = normaliserVin({ ...etat.vins[index], ...champs, id });
+  const vin = normaliserVin({ ...etat.vins[index], ...champs, id, modifieLe: maintenant() });
   etat.vins[index] = vin;
   enregistrer();
   synchro.ecrireVin(vin);
@@ -184,7 +189,7 @@ export function supprimerVin(id) {
   const detachees = [];
   etat.degustations = etat.degustations.map((d) => {
     if (d.vinId !== id) return d;
-    const detachee = { ...d, vinId: '' };
+    const detachee = { ...d, vinId: '', modifieLe: maintenant() };
     detachees.push(detachee);
     return detachee;
   });
@@ -261,6 +266,7 @@ export function boireBouteille(id, details = {}) {
     photo: details.photoLocale ? '' : vin.photo,
     photoLocale: details.photoLocale || vin.photoLocale,
     vinId: vin.id,
+    modifieLe: maintenant(),
   });
   etat.degustations.unshift(degustation);
   synchro.ecrireDegustation(degustation);
@@ -290,7 +296,9 @@ export function deplacerBouteilles(id, depuis, vers, nombre = 1) {
 // --- actions sur les dégustations -------------------------------------------
 
 export function ajouterDegustation(champs) {
-  const degustation = normaliserDegustation({ ...champs, id: identifiant('t') });
+  const degustation = normaliserDegustation({
+    ...champs, id: identifiant('t'), modifieLe: maintenant(),
+  });
   etat.degustations.unshift(degustation);
   enregistrer();
   synchro.ecrireDegustation(degustation);
@@ -300,7 +308,9 @@ export function ajouterDegustation(champs) {
 export function modifierDegustation(id, champs) {
   const index = etat.degustations.findIndex((d) => d.id === id);
   if (index === -1) return null;
-  const degustation = normaliserDegustation({ ...etat.degustations[index], ...champs, id });
+  const degustation = normaliserDegustation({
+    ...etat.degustations[index], ...champs, id, modifieLe: maintenant(),
+  });
   etat.degustations[index] = degustation;
   enregistrer();
   synchro.ecrireDegustation(degustation);

@@ -130,12 +130,25 @@ changements portant sur la même fiche entrent en conflit, et le dernier écrit
 l'emporte. Un document unique pour toute la cave aurait fait perdre le travail
 de l'un dès que l'autre touchait à quoi que ce soit.
 
+Chaque fiche porte la date à laquelle un appareil l'a modifiée, et non celle de
+son envoi. C'est elle qui départage deux appareils : celui qui retrouve le
+réseau après deux jours ne passe pas pour le plus à jour. Elle règle aussi
+l'arrivée d'un appareil supplémentaire, qui part du même classeur, avec les
+mêmes identifiants, et n'a donc rien à apporter : en se branchant, il n'envoie
+que les fiches qu'il a réellement touchées depuis, et reçoit le reste. L'ordre
+dans lequel les appareils se connectent n'a ainsi plus d'importance.
+
 Les photos prises depuis l'application suivent le même chemin : déposées chez
 l'hébergeur quand c'est possible, gardées dans le navigateur sinon.
 
 Une modification faite hors réseau est conservée et envoyée à la reprise. Les
 réglages indiquent où en est la synchronisation : active, en attente, ou
 absente.
+
+Le partage ne se limite pas aux appareils d'une seule personne. Chez un
+hébergeur qui distingue les niveaux d'accès, la cave n'est lisible et
+modifiable que par celles et ceux à qui le droit de modifier a été donné.
+Recevoir le lien ne suffit pas.
 
 Sans stockage partagé, rien ne change : la cave reste dans le navigateur et se
 transporte par une sauvegarde.

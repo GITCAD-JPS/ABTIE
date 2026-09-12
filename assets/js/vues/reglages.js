@@ -71,8 +71,8 @@ export function rendre(conteneur, { naviguer }) {
         text: store.etatSynchro() === 'local'
           ? 'La cave est enregistrée dans ce navigateur. Exportez une sauvegarde avant '
             + 'de changer d’appareil ou de vider les données du navigateur.'
-          : 'La cave est partagée entre vos appareils. Une sauvegarde reste utile pour '
-            + 'garder une copie hors de l’application.',
+          : 'La cave est partagée entre les appareils qui y ont accès. Une sauvegarde '
+            + 'reste utile pour garder une copie hors de l’application.',
       }),
       el('div', { class: 'rangee-boutons' }, [
         bouton('Sauvegarde complète (JSON)', {
@@ -130,8 +130,8 @@ export function rendre(conteneur, { naviguer }) {
       el('dd', {
         text: store.etatSynchro() === 'local'
           ? 'Ce navigateur seulement, aucune donnée envoyée en ligne'
-          : 'Ce navigateur, et un espace partagé rattaché à votre compte pour '
-            + 'que vos appareils se retrouvent',
+          : 'Ce navigateur, et un espace partagé rattaché à votre compte, ouvert '
+            + 'aux appareils que vous avez autorisés',
       }),
     ])),
   ]));
@@ -140,8 +140,9 @@ export function rendre(conteneur, { naviguer }) {
 const ETATS_SYNCHRO = {
   connecte: {
     titre: 'Active',
-    texte: 'La cave est partagée entre vos appareils. Une bouteille ouverte '
-      + "sur l'un apparaît sur l'autre en quelques secondes.",
+    texte: 'La cave est partagée entre vos appareils et ceux des personnes à qui '
+      + 'vous avez donné le droit de modifier. Une bouteille ouverte sur l’un '
+      + 'apparaît sur les autres en quelques secondes.',
   },
   attente: {
     titre: 'En attente',

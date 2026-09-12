@@ -81,6 +81,11 @@ export function aujourdhui() {
 
 // --- normalisation ----------------------------------------------------------
 
+// `modifieLe` porte l'heure à laquelle un appareil a touché la fiche, et reste
+// vide sur les fiches issues du classeur, que personne n'a encore modifiées.
+// C'est cette heure qui départage deux appareils ayant travaillé chacun de leur
+// côté : celle de l'envoi ne dirait que qui a retrouvé le réseau en premier.
+
 export function normaliserVin(brut = {}) {
   const emplacements = {};
   for (const { cle } of EMPLACEMENTS) {
@@ -107,6 +112,7 @@ export function normaliserVin(brut = {}) {
     notation: nombreOuNull(brut.notation),
     photo: String(brut.photo ?? '').trim(),
     photoLocale: String(brut.photoLocale ?? '').trim(),
+    modifieLe: String(brut.modifieLe ?? '').trim(),
   };
   vin.bouteillesRangees = Object.values(emplacements).reduce((a, b) => a + b, 0);
   return vin;
@@ -129,6 +135,7 @@ export function normaliserDegustation(brut = {}) {
     photo: String(brut.photo ?? '').trim(),
     photoLocale: String(brut.photoLocale ?? '').trim(),
     vinId: String(brut.vinId ?? '').trim(),
+    modifieLe: String(brut.modifieLe ?? '').trim(),
   };
 }
 

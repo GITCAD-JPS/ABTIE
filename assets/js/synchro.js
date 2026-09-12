@@ -66,19 +66,44 @@ export async function initialiser({ donneesLocales, onDonnees, onEtat }) {
 }
 
 /**
- * Amorce le stockage partagé avec la cave locale s'il est encore vide.
- * Sans cette étape, le premier appareil à se connecter verrait une cave vide
- * et effacerait la sienne en se synchronisant.
+ * Met le partage et la cave locale d'accord au moment de se brancher.
+ *
+ * Partage vide : on l'amorce avec la cave locale. Sans cette étape, le premier
+ * appareil à se connecter verrait une cave vide et effacerait la sienne.
+ *
+ * Partage déjà garni : c'est le cas d'un deuxième appareil, et le piège est
+ * qu'il part du même classeur, avec les mêmes identifiants. Reprendre le
+ * partage tel quel effacerait ce qu'il a modifié depuis. N'envoyer que ce qu'il
+ * a modifié plus récemment que le partage règle les deux sens : ses vraies
+ * modifications remontent, le reste redescend par l'écoute.
  */
 async function amorcer(locales) {
-  const existant = await base.collection(COLLECTIONS.vins).limit(1).get();
-  if (!existant.empty) return;
+  const [distantsVins, distantesDegustations] = await Promise.all([
+    base.collection(COLLECTIONS.vins).get(),
+    base.collection(COLLECTIONS.degustations).get(),
+  ]);
+  const partageVide = distantsVins.empty && distantesDegustations.empty;
 
-  const ecritures = [
-    ...locales.vins.map((vin) => ecrire(COLLECTIONS.vins, vin)),
-    ...locales.degustations.map((d) => ecrire(COLLECTIONS.degustations, d)),
-  ];
-  await Promise.all(ecritures);
+  await Promise.all([
+    ...aEnvoyer(locales.vins, distantsVins, partageVide)
+      .map((vin) => ecrire(COLLECTIONS.vins, vin)),
+    ...aEnvoyer(locales.degustations, distantesDegustations, partageVide)
+      .map((d) => ecrire(COLLECTIONS.degustations, d)),
+  ]);
+}
+
+/**
+ * Fiches locales que le partage ignore, ou qu'il connaît moins à jour.
+ * Une fiche jamais modifiée n'a pas de date et ne l'emporte donc sur rien : les
+ * cent dix-neuf fiches du classeur, identiques d'un appareil à l'autre, ne
+ * repartent pas écraser celles que l'autre a retouchées.
+ */
+function aEnvoyer(locales, distantes, partageVide) {
+  if (partageVide) return locales;
+  const connues = new Map(distantes.docs.map((d) => [d.id, d.data()?.modifieLe || '']));
+  return locales.filter((fiche) => (
+    !connues.has(fiche.id) || (fiche.modifieLe || '') > connues.get(fiche.id)
+  ));
 }
 
 function abonner() {
@@ -117,8 +142,11 @@ export function arreter() {
 
 // --- écritures --------------------------------------------------------------
 
+// La fiche part telle quelle : son `modifieLe` dit quand elle a été modifiée,
+// ce qui n'est pas forcément quand elle est envoyée. Un appareil qui retrouve
+// le réseau après deux jours ne doit pas passer pour le plus à jour.
 function ecrire(collection, fiche) {
-  return base.doc(`${collection}/${fiche.id}`).set({ ...fiche, majLe: new Date().toISOString() });
+  return base.doc(`${collection}/${fiche.id}`).set({ ...fiche });
 }
 
 /**
