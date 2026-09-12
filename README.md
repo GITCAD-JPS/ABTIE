@@ -1,5 +1,7 @@
 # Cave à vin
 
+**→ [Ouvrir l'application](https://gitcad-jps.github.io/ABTIE/)**
+
 Application web pour tenir l'inventaire de la cave : les bouteilles, leurs
 emplacements, les photos d'étiquettes et le journal des dégustations.
 
@@ -39,23 +41,30 @@ d'étiquettes et 21 dégustations.
 
 ## Utiliser l'application
 
-L'application est un site statique, sans installation ni compilation. Il faut
-seulement la servir par un serveur web, car le navigateur refuse de charger
-des modules JavaScript depuis un fichier ouvert directement.
+L'application est publiée sur GitHub Pages, à partir de la branche `main` et
+du dossier racine :
+
+**https://gitcad-jps.github.io/ABTIE/**
+
+Sur le téléphone, ouvrir cette adresse puis « Ajouter à l'écran d'accueil »
+installe l'application comme une application native, avec son icône. Une fois
+les photos mises en cache, elle reste consultable sans réseau, ce qui est
+utile au sous-sol.
+
+Les données restent dans le navigateur de chaque appareil et ne suivent donc
+pas de l'un à l'autre : voir « Où sont les données » plus bas.
+
+### En local
+
+Le site est entièrement statique, sans installation ni compilation, mais il
+faut le servir par un serveur web : le navigateur refuse de charger des
+modules JavaScript depuis un fichier ouvert directement.
 
 ```bash
 python3 -m http.server 8000
 ```
 
 Puis ouvrir http://localhost:8000 dans un navigateur.
-
-### Publier sur GitHub Pages
-
-Dans les réglages du dépôt, section Pages, choisir la branche à publier et le
-dossier racine. Le fichier `.nojekyll` est déjà présent pour que les dossiers
-soient servis tels quels. L'adresse obtenue peut ensuite être ajoutée à
-l'écran d'accueil du téléphone, ce qui installe l'application comme une
-application native.
 
 ## Où sont les données
 
