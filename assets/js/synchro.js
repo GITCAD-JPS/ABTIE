@@ -13,21 +13,51 @@
 
 const COLLECTIONS = { vins: 'vins', degustations: 'degustations', apercus: 'apercus' };
 const DELAI_REPRISE = 5000;
+// L'hébergeur installe son pont quand il veut, et rien ne dit qu'il l'a fait
+// au moment où l'application démarre. On lui laisse le temps d'arriver.
+const DELAI_PONT = 10000;
+const PAS_PONT = 100;
 
 let base = null;
 let abonnements = [];
 let rappels = {};
-let etatCourant = 'local';
+let etatCourant = 'recherche';
 const enAttente = [];
 let repriseProgrammee = null;
 
 /**
- * 'local' quand la page tourne là où aucun partage n'existe, 'horsCompte'
- * quand l'hébergeur en offre un mais le refuse à ce visiteur, 'connecte' quand
- * il répond, 'attente' quand il ne répond plus.
+ * 'recherche' tant qu'on ne sait pas encore, 'local' quand la page tourne là
+ * où aucun partage n'existe, 'horsCompte' quand l'hébergeur en offre un mais
+ * le refuse à ce visiteur, 'connecte' quand il répond, 'attente' sinon.
  */
 export const etat = () => etatCourant;
 export const synchroActive = () => Boolean(base);
+
+/**
+ * Attend que l'hébergeur pose son pont, sans dépasser `DELAI_PONT`.
+ *
+ * Le regarder une seule fois au démarrage revenait à tirer au sort : selon la
+ * vitesse de la page et le navigateur, il est là ou pas encore. Un appareil
+ * qui perdait cette course restait définitivement seul, en affirmant que
+ * l'application ne sait pas partager. C'est exactement ce qu'a vécu le
+ * deuxième téléphone.
+ */
+function attendrePont() {
+  const pont = () => (typeof globalThis.claude?.use === 'function' ? globalThis.claude.use : null);
+  const immediat = pont();
+  if (immediat) return Promise.resolve(immediat);
+
+  return new Promise((resoudre) => {
+    const echeance = Date.now() + DELAI_PONT;
+    const minuteur = setInterval(() => {
+      const trouve = pont();
+      if (trouve || Date.now() >= echeance) {
+        clearInterval(minuteur);
+        resoudre(trouve);
+      }
+    }, PAS_PONT);
+  });
+}
 
 function changerEtat(valeur) {
   if (etatCourant === valeur) return;
@@ -44,8 +74,11 @@ function changerEtat(valeur) {
 export async function initialiser({ donneesLocales, onDonnees, onEtat }) {
   rappels = { onDonnees, onEtat };
 
-  const use = globalThis.claude?.use;
-  if (typeof use !== 'function') return false;
+  const use = await attendrePont();
+  if (!use) {
+    changerEtat('local');
+    return false;
+  }
 
   try {
     base = await use('db');

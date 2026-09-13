@@ -147,14 +147,29 @@ seulement, une copie réduite de la photo part avec la cave, dans une collection
 suffisent à reconnaître une étiquette, et l'originale reste dans le navigateur
 qui l'a prise.
 
+L'hébergeur installe son pont quand il veut, et rien ne dit qu'il l'a fait au
+moment où l'application démarre. Le regarder une seule fois revenait à tirer au
+sort : selon la vitesse de la page et le navigateur, il est là ou pas encore, et
+l'appareil qui perdait cette course restait définitivement seul en affirmant que
+l'application ne sait pas partager. `attendrePont()` lui laisse dix secondes
+pour arriver.
+
 Une modification faite hors réseau est conservée et envoyée à la reprise. Les
-réglages indiquent où en est la synchronisation, et distinguent quatre
-situations : active, en attente de réseau, impossible ici faute de stockage
-partagé, ou refusée à ce visiteur parce qu'il n'est pas connecté à son compte.
+réglages indiquent où en est la synchronisation, et distinguent cinq
+situations : vérification en cours, active, en attente de réseau, impossible ici
+faute de stockage partagé, ou refusée à ce visiteur parce qu'il n'est pas
+connecté à son compte.
 Ce dernier cas est le piège : l'application sait partager, c'est l'hébergeur
 qui ferme la porte, et annoncer « cet appareil seulement » ferait chercher au
 mauvais endroit. La page se redessine quand l'état change, le partage se
 branchant une seconde après l'affichage.
+
+Un bloc « Détails techniques » y donne la version qui tourne, la présence du
+pont, l'état de l'autorisation et celui de l'espace partagé. Quand la
+synchronisation s'établit sur un appareil et pas sur un autre, la cause est
+invisible depuis l'écran : ces quatre lignes se photographient et disent
+laquelle. `VERSION_APP` dans `store.js` doit suivre la version de `sw.js`,
+sans quoi la première ligne ment.
 
 Le partage ne se limite pas aux appareils d'une seule personne. Chez un
 hébergeur qui distingue les niveaux d'accès, la cave n'est lisible et

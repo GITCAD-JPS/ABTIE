@@ -176,7 +176,19 @@ async function remettre(action, reussite) {
   }
 }
 
+const AUTORISATIONS = {
+  granted: 'accordée',
+  prompt: 'jamais demandée',
+  denied: 'refusée',
+  unavailable: 'indisponible',
+};
+
 const ETATS_SYNCHRO = {
+  recherche: {
+    titre: 'Vérification…',
+    texte: 'L’application regarde si un espace partagé est disponible ici. '
+      + 'Cela prend quelques secondes au démarrage.',
+  },
   connecte: {
     titre: 'Active',
     texte: 'La cave est partagée entre vos appareils et ceux des personnes à qui '
@@ -207,7 +219,49 @@ function etatSynchronisation() {
   return el('div', { class: 'synchro' }, [
     el('span', { class: `pastille-synchro ${etat}`, text: titre }),
     el('p', { class: 'discret', text: texte }),
+    diagnostic(),
   ]);
+}
+
+/**
+ * Ce que l'application voit de son hébergeur, en quatre lignes.
+ *
+ * Quand la synchronisation ne s'établit pas sur un appareil et pas sur un
+ * autre, la cause est invisible depuis l'écran : version restée en cache,
+ * pont absent, autorisation jamais demandée. Ces lignes se photographient et
+ * disent laquelle, au lieu de laisser essayer au hasard.
+ */
+function diagnostic() {
+  const valeurs = {};
+  const ligne = (libelle, cle) => {
+    valeurs[cle] = el('dd', { text: '…' });
+    return [el('dt', { text: libelle }), valeurs[cle]];
+  };
+
+  const bloc = el('details', { class: 'diagnostic' }, [
+    el('summary', { text: 'Détails techniques' }),
+    el('dl', { class: 'definitions' }, [
+      ...ligne('Version de l’application', 'version'),
+      ...ligne('Pont de la plateforme', 'pont'),
+      ...ligne('Autorisation des données', 'autorisation'),
+      ...ligne('Espace partagé', 'espace'),
+    ]),
+  ]);
+
+  const use = globalThis.claude?.use;
+  valeurs.version.textContent = store.VERSION_APP;
+  valeurs.pont.textContent = typeof use === 'function' ? 'présent' : 'absent';
+  valeurs.espace.textContent = store.partageBranche() ? 'ouvert' : 'fermé';
+
+  if (typeof use !== 'function') {
+    valeurs.autorisation.textContent = 'sans objet';
+    return bloc;
+  }
+  Promise.resolve(use('permissions'))
+    .then((permissions) => permissions?.state('db'))
+    .then((etat) => { valeurs.autorisation.textContent = AUTORISATIONS[etat] || 'inconnue'; })
+    .catch(() => { valeurs.autorisation.textContent = 'illisible'; });
+  return bloc;
 }
 
 function dateLisible(iso) {

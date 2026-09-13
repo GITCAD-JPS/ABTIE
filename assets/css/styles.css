@@ -1188,3 +1188,18 @@ select {
 .pastille-synchro.connecte { background: var(--accent-doux); color: var(--accent); }
 .pastille-synchro.attente { background: var(--alerte-fond); color: var(--alerte); }
 .pastille-synchro.horsCompte { background: var(--alerte-fond); color: var(--alerte); }
+.pastille-synchro.recherche { background: var(--fond-doux); color: var(--texte-discret); }
+
+.diagnostic {
+  margin-top: 0.9rem;
+  font-size: 0.85rem;
+}
+
+.diagnostic summary {
+  cursor: pointer;
+  color: var(--texte-discret);
+}
+
+.diagnostic .definitions {
+  margin-top: 0.6rem;
+}

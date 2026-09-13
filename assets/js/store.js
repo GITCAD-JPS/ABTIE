@@ -12,6 +12,9 @@ const CLE_DONNEES = 'cave-a-vin.donnees.v1';
 const CLE_PREFERENCES = 'cave-a-vin.preferences.v1';
 const CHEMIN_SEED = 'data/seed.json';
 export const VERSION_DONNEES = 1;
+// Affichée dans les réglages : sans elle, impossible de savoir à distance si
+// un appareil tourne encore sur une version en cache. À faire suivre sw.js.
+export const VERSION_APP = '14';
 
 const etat = {
   vins: [],
