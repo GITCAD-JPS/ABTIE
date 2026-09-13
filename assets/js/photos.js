@@ -16,10 +16,11 @@ const MAGASIN = 'photos';
 const COTE_MAX = 1400;
 const QUALITE = 0.82;
 // Copie réduite qui voyage avec la cave quand le dépôt de l'hébergeur est
-// fermé. Assez fine pour reconnaître une étiquette, assez légère pour tenir
-// dans un document sans peser sur la synchronisation.
-const APERCU_COTE = 420;
-const APERCU_QUALITE = 0.62;
+// fermé. C'est alors la seule image que voient les autres appareils, d'où une
+// définition confortable. Elle vit dans son propre document, lu à la demande
+// et jamais dans les instantanés, ce qui permet de ne pas la rogner.
+const APERCU_COTE = 640;
+const APERCU_QUALITE = 0.7;
 // Une photo déposée chez l'hébergeur porte ce préfixe : elle suit alors la
 // cave d'un appareil à l'autre, au lieu de rester dans un seul navigateur.
 const PREFIXE_PARTAGE = 'a:';

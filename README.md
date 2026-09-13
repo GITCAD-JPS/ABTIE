@@ -139,13 +139,17 @@ que les fiches qu'il a réellement touchées depuis, et reçoit le reste. L'ordr
 dans lequel les appareils se connectent n'a ainsi plus d'importance.
 
 Les photos prises depuis l'application suivent le même chemin : déposées chez
-l'hébergeur quand c'est possible, gardées dans le navigateur sinon. Le dépôt de
-fichiers n'est ouvert qu'à qui peut modifier la page, et un appareil qui ne l'a
-pas verrait donc ses vins arriver sans étiquette chez les autres. Dans ce cas
-seulement, une copie réduite de la photo part avec la cave, dans une collection
-à part pour ne pas alourdir les instantanés. Une quinzaine de kilo-octets
-suffisent à reconnaître une étiquette, et l'originale reste dans le navigateur
-qui l'a prise.
+l'hébergeur quand c'est possible, gardées dans le navigateur sinon. Dans ce
+second cas, une copie réduite de la photo part avec la cave, dans une
+collection à part, lue à la demande et jamais incluse dans les instantanés.
+Elle devient alors la seule image que voient les autres appareils, d'où une
+définition confortable, autour de vingt-cinq kilo-octets. L'originale reste
+dans le navigateur qui l'a prise.
+
+Le dépôt de fichiers de l'hébergeur n'est pas déclaré ici, et c'est délibéré :
+une page qui le déclare devient réservée à l'organisation de son auteur et ne
+peut plus être partagée au-delà. Entre garder les photos en pleine définition
+et pouvoir tenir la cave à deux, c'est le partage qui compte.
 
 L'hébergeur installe son pont quand il veut, et rien ne dit qu'il l'a fait au
 moment où l'application démarre. Le regarder une seule fois revenait à tirer au
