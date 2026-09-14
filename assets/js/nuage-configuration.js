@@ -9,8 +9,8 @@
 // ici.
 
 export const CONFIGURATION = {
-  projet: '',
-  cle: '',
+  projet: 'cave-a-vin-5a2b6',
+  cle: 'AIzaSyCBX4WIoGoZg1bSO5bSl5GAkixCdHJWT9o',
   // Séparée pour qu'un banc d'essai puisse viser une base locale, et parce
   // qu'un service qui change d'adresse ne doit pas obliger à toucher au code.
   racine: 'https://firestore.googleapis.com/v1',
