@@ -1,6 +1,11 @@
 # Cave à vin
 
-**→ [Ouvrir l'application](https://gitcad-jps.github.io/Cave-a-vin-jps/)**
+**→ [Ouvrir la copie autonome](https://gitcad-jps.github.io/Cave-a-vin-jps/)**
+
+Cette adresse sert une copie **sans synchronisation** : la cave y vit dans le
+seul navigateur qui l'ouvre. Elle ne remplace pas l'adresse partagée, où les
+appareils se retrouvent. Saisir dans l'une en croyant alimenter l'autre coûte
+le travail d'une soirée, et l'application le dit maintenant par un bandeau.
 
 Application web pour tenir l'inventaire de la cave : les bouteilles, leurs
 emplacements, les photos d'étiquettes et le journal des dégustations.

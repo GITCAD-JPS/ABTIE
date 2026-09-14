@@ -138,6 +138,7 @@ async function demarrer() {
 
   document.body.classList.remove('chargement');
   avertirSiStockageRefuse();
+  surveillerLePartage();
   rendre();
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -161,6 +162,33 @@ function avertirSiStockageRefuse() {
         + 'sauvegarde depuis les réglages avant de fermer.',
     }),
   ]));
+}
+
+/**
+ * Prévient quand cette copie ne partage rien.
+ *
+ * L'application existe à deux adresses : l'une partage la cave entre les
+ * appareils, l'autre est une copie autonome. Rien ne les distingue à l'écran,
+ * et saisir une soirée de dégustations dans la mauvaise revient à la perdre.
+ * L'avertissement attend que la synchronisation ait tranché, car au démarrage
+ * elle cherche encore et se déclarer local trop tôt serait faux.
+ */
+function surveillerLePartage() {
+  let annonce = false;
+  const verifier = () => {
+    if (annonce || store.etatSynchro() !== 'local') return;
+    annonce = true;
+    document.body.prepend(el('div', { class: 'bandeau-alerte', role: 'status' }, [
+      el('strong', { text: 'Copie autonome, sans synchronisation. ' }),
+      el('span', {
+        text: 'Ce que vous saisissez ici reste dans ce navigateur et ne rejoint '
+          + 'aucun autre appareil. Pour tenir la cave à plusieurs, passez par '
+          + 'l’adresse partagée.',
+      }),
+    ]));
+  };
+  store.abonner(verifier);
+  verifier();
 }
 
 window.addEventListener('error', (evenement) => {
