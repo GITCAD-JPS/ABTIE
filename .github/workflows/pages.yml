@@ -1,4 +1,4 @@
-# Publie le site sur GitHub Pages à chaque poussée sur main.
+# Publie le site sur GitHub Pages à chaque poussée.
 #
 # Étape à faire une seule fois, à la main : Settings → Pages → Source →
 # « GitHub Actions ». Créer un site Pages exige les droits d'administration
@@ -10,7 +10,12 @@ name: Publier sur GitHub Pages
 
 on:
   push:
-    branches: [main]
+    # Le développement se fait sur la branche claude/, qui est aussi la
+    # branche par défaut du dépôt. Ne surveiller que main revenait à publier
+    # un état figé au dernier passage par là, huit commits en arrière.
+    # Les deux sont listées pour que la publication suive, que la branche par
+    # défaut change un jour ou non.
+    branches: [main, claude/wine-cellar-app-pcaso0]
   workflow_dispatch:
 
 permissions:
