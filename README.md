@@ -124,69 +124,54 @@ renoncer sans attendre.
 ## Plusieurs appareils
 
 L'application est locale d'abord : elle lit et écrit dans le navigateur,
-s'affiche instantanément et fonctionne sans réseau. Quand la page tourne chez
-un hébergeur qui offre un stockage partagé, `assets/js/synchro.js` s'y branche
-en plus et les appareils se retrouvent. Deux iPhones ouvrant la même adresse
-voient alors la même cave, à quelques secondes près.
+s'affiche instantanément et fonctionne sans réseau. Quand une cave partagée
+est configurée, `assets/js/nuage.js` s'y branche en plus, et les appareils qui
+portent le même code voient la même cave.
+
+Le partage passe par une base Firestore atteinte directement en HTTP, sans
+aucune bibliothèque à charger. Une page statique suffit donc : pas de serveur
+à tenir, pas de compte à créer, pas de connexion à demander à qui que ce soit.
+
+L'accès repose sur un **code long et imprévisible** qui fait partie du chemin
+des données. Qui ne l'a pas ne trouve rien, exactement comme un lien privé.
+C'est ce qui convient à une cave de particuliers, et il faut le savoir :
+quiconque obtient le code accède à la cave. Le code se crée une fois depuis
+les réglages, puis se recopie sur le deuxième appareil.
 
 Chaque vin et chaque dégustation est un document distinct. C'est ce qui permet
 à deux appareils de modifier la cave en même temps sans s'écraser : seuls des
 changements portant sur la même fiche entrent en conflit, et le dernier écrit
-l'emporte. Un document unique pour toute la cave aurait fait perdre le travail
-de l'un dès que l'autre touchait à quoi que ce soit.
+l'emporte.
 
 Chaque fiche porte la date à laquelle un appareil l'a modifiée, et non celle de
 son envoi. C'est elle qui départage deux appareils : celui qui retrouve le
 réseau après deux jours ne passe pas pour le plus à jour. Elle règle aussi
 l'arrivée d'un appareil supplémentaire, qui part du même classeur, avec les
 mêmes identifiants, et n'a donc rien à apporter : en se branchant, il n'envoie
-que les fiches qu'il a réellement touchées depuis, et reçoit le reste. L'ordre
-dans lequel les appareils se connectent n'a ainsi plus d'importance.
+que les fiches qu'il a réellement touchées depuis, et reçoit le reste.
 
-Les photos prises depuis l'application suivent le même chemin : déposées chez
-l'hébergeur quand c'est possible, gardées dans le navigateur sinon. Dans ce
-second cas, une copie réduite de la photo part avec la cave, dans une
-collection à part, lue à la demande et jamais incluse dans les instantanés.
-Elle devient alors la seule image que voient les autres appareils, d'où une
-définition confortable, autour de vingt-cinq kilo-octets. L'originale reste
-dans le navigateur qui l'a prise.
+Firestore n'offre pas d'écoute temps réel en HTTP simple. Plutôt que de relire
+la cave entière sans arrêt, l'application interroge toutes les huit secondes un
+minuscule document témoin, mis à jour à chaque écriture. La cave n'est relue
+que lorsqu'il change, ce qui laisse le trafic à quelques centaines d'octets
+tant que personne ne touche à rien.
 
-Le dépôt de fichiers de l'hébergeur n'est pas déclaré ici, et c'est délibéré :
-une page qui le déclare devient réservée à l'organisation de son auteur et ne
-peut plus être partagée au-delà. Entre garder les photos en pleine définition
-et pouvoir tenir la cave à deux, c'est le partage qui compte.
-
-L'hébergeur installe son pont quand il veut, et rien ne dit qu'il l'a fait au
-moment où l'application démarre. Le regarder une seule fois revenait à tirer au
-sort : selon la vitesse de la page et le navigateur, il est là ou pas encore, et
-l'appareil qui perdait cette course restait définitivement seul en affirmant que
-l'application ne sait pas partager. `attendrePont()` lui laisse dix secondes
-pour arriver.
+Les photos prises depuis l'application restent dans le navigateur qui les a
+prises, et une copie réduite part avec la cave, dans une collection à part lue
+à la demande. Une vingtaine de kilo-octets suffisent à reconnaître une
+étiquette.
 
 Une modification faite hors réseau est conservée et envoyée à la reprise. Les
-réglages indiquent où en est la synchronisation, et distinguent cinq
-situations : vérification en cours, active, en attente de réseau, impossible ici
-faute de stockage partagé, ou refusée à ce visiteur parce qu'il n'est pas
-connecté à son compte.
-Ce dernier cas est le piège : l'application sait partager, c'est l'hébergeur
-qui ferme la porte, et annoncer « cet appareil seulement » ferait chercher au
-mauvais endroit. La page se redessine quand l'état change, le partage se
-branchant une seconde après l'affichage.
+réglages indiquent où en est la synchronisation, et distinguent : vérification
+en cours, active, en attente de réseau, pas encore partagée, ou impossible sur
+cette version faute de base configurée. Un bandeau le dit aussi en haut de
+l'écran quand la cave ne rejoint aucun autre appareil, car saisir une soirée
+de dégustations en croyant les partager coûte cher.
 
-Un bloc « Détails techniques » y donne la version qui tourne, la présence du
-pont, l'état de l'autorisation et celui de l'espace partagé. Quand la
-synchronisation s'établit sur un appareil et pas sur un autre, la cause est
-invisible depuis l'écran : ces quatre lignes se photographient et disent
-laquelle. `VERSION_APP` dans `store.js` doit suivre la version de `sw.js`,
-sans quoi la première ligne ment.
-
-Le partage ne se limite pas aux appareils d'une seule personne. Chez un
-hébergeur qui distingue les niveaux d'accès, la cave n'est lisible et
-modifiable que par celles et ceux à qui le droit de modifier a été donné.
-Recevoir le lien ne suffit pas.
-
-Sans stockage partagé, rien ne change : la cave reste dans le navigateur et se
-transporte par une sauvegarde.
+`assets/js/nuage-configuration.js` porte les coordonnées de la base. Tant
+qu'il est vide, l'application fonctionne normalement mais pour elle seule. Les
+deux valeurs y sont publiques par nature, elles voyagent dans chaque page
+servie : ce n'est pas elles qui protègent la cave, c'est le code d'accès.
 
 ## Où sont les données
 

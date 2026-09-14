@@ -63,7 +63,7 @@ export function rendre(conteneur, { naviguer }) {
       ]),
     ])),
 
-    section('Synchronisation', [etatSynchronisation()]),
+    section('Cave partagée', [etatSynchronisation(), reglageDuCode()]),
 
     section('Sauvegarde', [
       el('p', {
@@ -200,11 +200,10 @@ const ETATS_SYNCHRO = {
     texte: 'Le partage ne répond pas pour le moment. Vos modifications sont '
       + 'conservées ici et seront envoyées dès que possible.',
   },
-  horsCompte: {
-    titre: 'Connexion requise',
-    texte: 'Le partage passe par un compte, et cet appareil n’y est pas '
-      + 'connecté. La cave reste donc dans ce navigateur. Connectez-vous '
-      + 'depuis le bandeau en haut de la page, puis rouvrez le lien.',
+  sansCode: {
+    titre: 'Pas encore partagée',
+    texte: 'Cette cave vit dans ce seul navigateur. Créez une cave partagée '
+      + 'ci-dessous, ou saisissez le code de celle qui existe déjà.',
   },
   local: {
     titre: 'Cet appareil seulement',
@@ -220,6 +219,102 @@ function etatSynchronisation() {
     el('span', { class: `pastille-synchro ${etat}`, text: titre }),
     el('p', { class: 'discret', text: texte }),
     diagnostic(),
+  ]);
+}
+
+/**
+ * Création ou saisie du code d'accès à la cave partagée.
+ *
+ * Le code est la clé : il fait partie du chemin des données, et deux appareils
+ * qui le portent voient la même cave. Il s'affiche en clair une fois posé, car
+ * il faut pouvoir le recopier sur le deuxième téléphone.
+ */
+function reglageDuCode() {
+  if (!store.partageConfigure()) {
+    return el('p', {
+      class: 'discret',
+      text: 'Cette version de l’application n’est reliée à aucune cave '
+        + 'partagée. Elle fonctionne normalement, mais pour elle seule.',
+    });
+  }
+
+  const actuel = store.codePartage();
+  if (actuel) return codeEnPlace(actuel);
+
+  const saisie = el('input', {
+    type: 'text', class: 'code-partage', placeholder: 'Code reçu',
+    autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false',
+    'aria-label': 'Code de la cave à rejoindre',
+  });
+
+  return el('div', { class: 'partage-code' }, [
+    el('div', { class: 'rangee-boutons' }, [
+      bouton('Créer une cave partagée', {
+        classe: 'bouton bouton-primaire',
+        onclick: () => store.definirCodePartage(store.inventerCode()),
+      }),
+    ]),
+    el('p', {
+      class: 'discret',
+      text: 'Ou rejoignez celle qui existe déjà, avec le code affiché sur '
+        + 'l’autre téléphone.',
+    }),
+    saisie,
+    el('div', { class: 'rangee-boutons' }, [
+      bouton('Rejoindre', {
+        onclick: () => {
+          const valeur = saisie.value.trim();
+          if (!valeur) {
+            message('Saisissez le code de la cave', 'erreur');
+            return;
+          }
+          store.definirCodePartage(valeur);
+        },
+      }),
+    ]),
+  ]);
+}
+
+function codeEnPlace(actuel) {
+  const champ = el('input', {
+    type: 'text', class: 'code-partage', value: actuel, readonly: true,
+    'aria-label': 'Code de la cave partagée',
+  });
+  champ.addEventListener('focus', () => champ.select());
+
+  return el('div', { class: 'partage-code' }, [
+    el('p', {
+      class: 'discret',
+      text: 'Recopiez ce code sur l’autre téléphone pour qu’il rejoigne cette '
+        + 'cave. Ne le communiquez à personne d’autre : il donne accès à la '
+        + 'cave entière.',
+    }),
+    champ,
+    el('div', { class: 'rangee-boutons' }, [
+      bouton('Copier le code', {
+        onclick: async () => {
+          try {
+            await navigator.clipboard.writeText(actuel);
+            message('Code copié');
+          } catch {
+            champ.focus();
+            message('Sélectionnez et copiez le code affiché');
+          }
+        },
+      }),
+      bouton('Quitter cette cave partagée', {
+        classe: 'bouton bouton-danger-discret',
+        onclick: async () => {
+          const accord = await confirmer(
+            'Quitter la cave partagée',
+            'Cet appareil ne recevra plus les modifications des autres. La '
+              + 'cave reste ici, et le partage continue sans lui.',
+            { libelleAction: 'Quitter', danger: true },
+          );
+          if (accord) store.definirCodePartage('');
+        },
+      }),
+    ]),
   ]);
 }
 

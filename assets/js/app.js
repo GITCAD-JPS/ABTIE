@@ -164,27 +164,39 @@ function avertirSiStockageRefuse() {
   ]));
 }
 
+// Ce que dit le bandeau selon la raison du non-partage. Une cave qui n'est
+// pas partagée n'est pas une panne, mais le dire évite de saisir une soirée
+// de dégustations en croyant qu'elles rejoignent l'autre téléphone.
+const AVERTISSEMENTS = {
+  sansCode: {
+    titre: 'Cette cave n’est pas encore partagée. ',
+    texte: 'Ce que vous saisissez reste dans ce navigateur. Créez la cave '
+      + 'partagée, ou rejoignez-la avec son code, depuis les réglages.',
+  },
+  local: {
+    titre: 'Aucun partage possible sur cette version. ',
+    texte: 'Ce que vous saisissez reste dans ce navigateur et ne rejoindra '
+      + 'aucun autre appareil.',
+  },
+};
+
 /**
- * Prévient quand cette copie ne partage rien.
+ * Prévient quand cette cave ne rejoint aucun autre appareil.
  *
- * L'application existe à deux adresses : l'une partage la cave entre les
- * appareils, l'autre est une copie autonome. Rien ne les distingue à l'écran,
- * et saisir une soirée de dégustations dans la mauvaise revient à la perdre.
- * L'avertissement attend que la synchronisation ait tranché, car au démarrage
- * elle cherche encore et se déclarer local trop tôt serait faux.
+ * L'avertissement attend que la synchronisation ait tranché : au démarrage
+ * elle cherche encore, et conclure trop tôt serait faux. Il mène aux réglages,
+ * car savoir sans savoir quoi faire ne sert à rien.
  */
 function surveillerLePartage() {
   let annonce = false;
   const verifier = () => {
-    if (annonce || store.etatSynchro() !== 'local') return;
+    const avertissement = AVERTISSEMENTS[store.etatSynchro()];
+    if (annonce || !avertissement) return;
     annonce = true;
     document.body.prepend(el('div', { class: 'bandeau-alerte', role: 'status' }, [
-      el('strong', { text: 'Copie autonome, sans synchronisation. ' }),
-      el('span', {
-        text: 'Ce que vous saisissez ici reste dans ce navigateur et ne rejoint '
-          + 'aucun autre appareil. Pour tenir la cave à plusieurs, passez par '
-          + 'l’adresse partagée.',
-      }),
+      el('strong', { text: avertissement.titre }),
+      el('span', { text: avertissement.texte }),
+      el('a', { class: 'bandeau-lien', href: '#/reglages', text: 'Ouvrir les réglages' }),
     ]));
   };
   store.abonner(verifier);

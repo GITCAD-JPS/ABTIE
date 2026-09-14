@@ -1,7 +1,7 @@
 /* Service worker : la cave reste consultable sans réseau, y compris au sous-sol.
    Changez VERSION à chaque modification des fichiers pour forcer la mise à jour. */
 
-const VERSION = 'cave-a-vin-v16';
+const VERSION = 'cave-a-vin-v17';
 
 const COQUILLE = [
   './',
@@ -18,7 +18,8 @@ const COQUILLE = [
   './assets/js/model.js',
   './assets/js/photos.js',
   './assets/js/store.js',
-  './assets/js/synchro.js',
+  './assets/js/nuage.js',
+  './assets/js/nuage-configuration.js',
   './assets/js/theme.js',
   './assets/js/vues/accords.js',
   './assets/js/vues/cave.js',

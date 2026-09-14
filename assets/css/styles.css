@@ -1203,3 +1203,25 @@ select {
 .diagnostic .definitions {
   margin-top: 0.6rem;
 }
+
+/* Le code de la cave partagée doit se lire caractère par caractère, pour être
+   recopié sans erreur d'un téléphone à l'autre. */
+.code-partage {
+  width: 100%;
+  margin: 0.6rem 0;
+  padding: 0.6rem 0.7rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--bordure);
+  border-radius: 0.5rem;
+  background: var(--fond-doux);
+  color: var(--texte);
+}
+
+.bandeau-lien {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-weight: 600;
+  color: inherit;
+}

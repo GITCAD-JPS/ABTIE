@@ -6,7 +6,7 @@ import {
   normaliserDegustation, normaliserVin,
 } from './model.js';
 import * as photos from './photos.js';
-import * as synchro from './synchro.js';
+import * as synchro from './nuage.js';
 
 const CLE_DONNEES = 'cave-a-vin.donnees.v1';
 const CLE_PREFERENCES = 'cave-a-vin.preferences.v1';
@@ -14,7 +14,7 @@ const CHEMIN_SEED = 'data/seed.json';
 export const VERSION_DONNEES = 1;
 // Affichée dans les réglages : sans elle, impossible de savoir à distance si
 // un appareil tourne encore sur une version en cache. À faire suivre sw.js.
-export const VERSION_APP = '16';
+export const VERSION_APP = '17';
 
 const etat = {
   vins: [],
@@ -39,6 +39,23 @@ export const donnees = () => etat;
 export const etatSynchro = () => synchro.etat();
 /** Le partage est-il réellement branché, quel que soit son état du moment ? */
 export const partageBranche = () => synchro.synchroActive();
+/** Cette version sait-elle joindre une cave partagée ? */
+export const partageConfigure = () => synchro.configure();
+/** Le code d'accès enregistré sur cet appareil, vide s'il n'y en a pas. */
+export const codePartage = () => synchro.codeConfigure();
+export const inventerCode = () => synchro.inventerCode();
+
+/**
+ * Change la cave partagée à laquelle cet appareil se rattache.
+ *
+ * Le rechargement n'est pas une facilité : tout l'état de la synchronisation,
+ * de la file d'attente au document témoin, se rapporte à une cave précise.
+ * Repartir de zéro est plus sûr que de démêler l'ancien du nouveau.
+ */
+export function definirCodePartage(valeur) {
+  synchro.enregistrerCode(valeur);
+  location.reload();
+}
 export const vins = () => etat.vins;
 export const degustations = () => etat.degustations;
 export const preferences = () => etat.preferences;

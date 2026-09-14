@@ -9,7 +9,7 @@
 // le temps de la session et l'application reste utilisable. `enMemoire()` dit
 // si c'est le cas, pour prévenir honnêtement.
 
-import * as synchro from './synchro.js';
+import * as synchro from './nuage.js';
 
 const BASE = 'cave-a-vin';
 const MAGASIN = 'photos';
