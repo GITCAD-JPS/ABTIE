@@ -1,6 +1,6 @@
 # Cave à vin
 
-**→ [Ouvrir l'application](https://gitcad-jps.github.io/cave-a-vin-jps/)**
+**→ [Ouvrir l'application](https://gitcad-jps.github.io/Cave-a-vin-jps/)**
 
 Application web pour tenir l'inventaire de la cave : les bouteilles, leurs
 emplacements, les photos d'étiquettes et le journal des dégustations.
@@ -54,7 +54,7 @@ d'étiquettes et 21 dégustations.
 L'application est publiée sur GitHub Pages par le workflow
 `.github/workflows/pages.yml`, à chaque poussée sur `main` :
 
-**https://gitcad-jps.github.io/cave-a-vin-jps/**
+**https://gitcad-jps.github.io/Cave-a-vin-jps/**
 
 Sur le téléphone, ouvrir cette adresse puis « Ajouter à l'écran d'accueil »
 installe l'application comme une application native, avec son icône. Une fois
